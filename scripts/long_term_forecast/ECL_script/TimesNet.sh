@@ -11,9 +11,9 @@ python -u run.py \
   --model $model_name \
   --data custom \
   --features M \
-  --seq_len 96 \
-  --label_len 48 \
-  --pred_len 96 \
+  --seq_len 128 \
+  --label_len 64 \
+  --pred_len 128 \
   --e_layers 2 \
   --d_layers 1 \
   --factor 3 \
@@ -25,7 +25,7 @@ python -u run.py \
   --top_k 3 \
   --des 'Exp' \
   --itr 1 \
-  --use_amp 1 \
+  --use_amp \
   --batch_size 32 \
   --num_workers 4
 
