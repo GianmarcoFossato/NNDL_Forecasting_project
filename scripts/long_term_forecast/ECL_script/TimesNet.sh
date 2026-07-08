@@ -22,9 +22,12 @@ python -u run.py \
   --c_out 321 \
   --d_model 256 \
   --d_ff 512 \
-  --top_k 5 \
+  --top_k 3 \
   --des 'Exp' \
-  --itr 1
+  --itr 1 \
+  --use_amp 1 \
+  --batch_size 32 \
+  --num_workers 4
 
 python -u run.py \
   --task_name long_term_forecast \
@@ -46,7 +49,7 @@ python -u run.py \
   --c_out 321 \
   --d_model 256 \
   --d_ff 512 \
-  --top_k 5 \
+  --top_k 3 \
   --des 'Exp' \
   --itr 1
 
@@ -70,7 +73,7 @@ python -u run.py \
   --c_out 321 \
   --d_model 256 \
   --d_ff 512 \
-  --top_k 5 \
+  --top_k 3 \
   --des 'Exp' \
   --itr 1
 
@@ -94,6 +97,6 @@ python -u run.py \
   --c_out 321 \
   --d_model 256 \
   --d_ff 512 \
-  --top_k 5 \
+  --top_k 3 \
   --des 'Exp' \
   --itr 1
