@@ -180,21 +180,6 @@ if __name__ == '__main__':
     if args.task_name == 'long_term_forecast':
         from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
         Exp = Exp_Long_Term_Forecast
-    elif args.task_name == 'short_term_forecast':
-        from exp.exp_short_term_forecasting import Exp_Short_Term_Forecast
-        Exp = Exp_Short_Term_Forecast
-    elif args.task_name == 'imputation':
-        from exp.exp_imputation import Exp_Imputation
-        Exp = Exp_Imputation
-    elif args.task_name == 'anomaly_detection':
-        from exp.exp_anomaly_detection import Exp_Anomaly_Detection
-        Exp = Exp_Anomaly_Detection
-    elif args.task_name == 'classification':
-        from exp.exp_classification import Exp_Classification
-        Exp = Exp_Classification
-    elif args.task_name == 'zero_shot_forecast':
-        from exp.exp_zero_shot_forecasting import Exp_Zero_Shot_Forecast
-        Exp = Exp_Zero_Shot_Forecast
     else:
         from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
         Exp = Exp_Long_Term_Forecast

@@ -1,8 +1,6 @@
 # Time Series Library (TSLib)
 TSLib is an open-source library for deep learning researchers, especially for deep time series analysis.
 
-> **中文文档**：[README_zh.md](./README_zh.md)
-
 We provide a neat code base to evaluate advanced deep time series models or develop your model, which covers five mainstream tasks: **long- and short-term forecasting, imputation, anomaly detection, and classification.**
 
 :triangular_flag_on_post:**News** (2026.04) Due to the limited bandwidth of the current maintainers, we will not be actively adding new features to this library. Since the library was originally released three years ago, many of its benchmarks may no longer be meaningful for evaluating the effectiveness or progress of current research. However, the baseline implementations remain correct. We therefore recommend seeking out newer benchmarks.
