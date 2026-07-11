@@ -27,7 +27,7 @@ python -u run.py \
   --d_ff 512 \
   --top_k 5 \
   --des 'Exp' \
-  --itr 1
+  --itr 1  \
   --batch_size $BATCH_SIZE \
   --num_workers $WORKERS
 
