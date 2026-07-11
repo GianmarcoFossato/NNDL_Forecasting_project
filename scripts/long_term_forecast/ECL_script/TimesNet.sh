@@ -1,6 +1,9 @@
 # export CUDA_VISIBLE_DEVICES=0
-
 model_name=TimesNet
+
+# Tailored for 4 CPU cores and 96GB VRAM
+BATCH_SIZE=256
+WORKERS=4
 
 python -u run.py \
   --task_name long_term_forecast \
@@ -25,9 +28,8 @@ python -u run.py \
   --top_k 3 \
   --des 'Exp' \
   --itr 1 \
-  --use_amp \
-  --batch_size 32 \
-  --num_workers 4
+  --batch_size $BATCH_SIZE \
+  --num_workers $WORKERS
 
 python -u run.py \
   --task_name long_term_forecast \
@@ -51,7 +53,9 @@ python -u run.py \
   --d_ff 512 \
   --top_k 3 \
   --des 'Exp' \
-  --itr 1
+  --itr 1 \
+  --batch_size $BATCH_SIZE \
+  --num_workers $WORKERS
 
 python -u run.py \
   --task_name long_term_forecast \
@@ -75,7 +79,9 @@ python -u run.py \
   --d_ff 512 \
   --top_k 3 \
   --des 'Exp' \
-  --itr 1
+  --itr 1 \
+  --batch_size $BATCH_SIZE \
+  --num_workers $WORKERS
 
 python -u run.py \
   --task_name long_term_forecast \
@@ -99,4 +105,6 @@ python -u run.py \
   --d_ff 512 \
   --top_k 3 \
   --des 'Exp' \
-  --itr 1
+  --itr 1 \
+  --batch_size $BATCH_SIZE \
+  --num_workers $WORKERS
