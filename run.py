@@ -282,6 +282,30 @@ if __name__ == '__main__':
                     + f'_expand{args.expand}_dc{args.d_conv}_nk{args.num_kernels}' \
                     + f'_tvdt{args.tv_dt}_tvB{args.tv_B}_tvC{args.tv_C}_useD{int(args.use_D)}_{args.des}_{ii}'
 
+        log_dir = os.path.join('./test_results', setting)
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Create log Folder and redirect stream outputs here
+        class CustomTeeLogger(object):
+            def __init__(self, filepath):
+                self.terminal = sys.stdout
+                self.log = open(filepath, "a", encoding="utf-8")
+
+            def write(self, message):
+                self.terminal.write(message)
+                self.log.write(message)
+                self.log.flush()  # Forces real-time streaming
+
+            def flush(self):
+                self.terminal.flush()
+                self.log.flush()
+
+
+        # Redirect stdout and stderr straight to the log folder
+        log_file_path = os.path.join(log_dir, "output.log")
+        sys.stdout = CustomTeeLogger(log_file_path)
+        sys.stderr = sys.stdout
+
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
         exp.test(setting, test=1)
         if args.use_gpu:
