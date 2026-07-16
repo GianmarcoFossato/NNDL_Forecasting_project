@@ -1,12 +1,60 @@
 import argparse
 import os
 import sys
+import io
 import torch.backends
 from utils.print_args import print_args
 import random
 import numpy as np
 
+#Logger
+class OutputLogger(object):
+    def __init__(self):
+        self.terminal = sys.stdout
+        self.buffer = io.StringIO()
+        self.log_file = None
+
+        # for buffering early prints
+        sys.stdout = self
+        sys.stderr = self
+
+    def activate_file_logging(self, log_dir):
+        """Switches from RAM buffering to live file streaming."""
+        os.makedirs(log_dir, exist_ok=True)
+        filepath = os.path.join(log_dir, "output.log")
+
+        # Write what we have saved in memory so far
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(self.buffer.getvalue())
+
+        # Clean up the memory buffer and open the live file stream
+        self.buffer.close()
+        self.buffer = None
+        self.log_file = open(filepath, "a", encoding="utf-8")
+
+    def deactivate_file_logging(self):
+        """Safely closes the file stream and resets to standard behavior."""
+        if self.log_file:
+            self.log_file.close()
+            self.log_file = None
+        self.buffer = io.StringIO()  # Reset fresh buffer for the next model iteration
+
+    def write(self, message):
+        self.terminal.write(message)  # Always print to the terminal window
+        if self.log_file:
+            self.log_file.write(message)  # Stream to file if it's active
+            self.log_file.flush()
+        elif self.buffer:
+            self.buffer.write(message)  # Otherwise, queue up in memory
+
+    def flush(self):
+        self.terminal.flush()
+        if self.log_file:
+            self.log_file.flush()
+
 if __name__ == '__main__':
+    logger = OutputLogger()
+
     fix_seed = 2021
     random.seed(fix_seed)
     torch.manual_seed(fix_seed)
@@ -217,35 +265,18 @@ if __name__ == '__main__':
                         + f'_expand{args.expand}_dc{args.d_conv}_nk{args.num_kernels}' \
                         + f'_tvdt{int(args.tv_dt)}_tvB{int(args.tv_B)}_tvC{int(args.tv_C)}_useD{int(args.use_D)}_{args.des}_{ii}'
 
-            log_dir = os.path.join('./test_results', setting)
-            os.makedirs(log_dir, exist_ok=True)
-
-            # Create log Folder and redirect stream outputs here
-            class CustomTeeLogger(object):
-                def __init__(self, filepath):
-                    self.terminal = sys.stdout
-                    self.log = open(filepath, "a", encoding="utf-8")
-
-                def write(self, message):
-                    self.terminal.write(message)
-                    self.log.write(message)
-                    self.log.flush()  # Forces real-time streaming
-
-                def flush(self):
-                    self.terminal.flush()
-                    self.log.flush()
-
-
-            # Redirect stdout and stderr straight to the log folder
-            log_file_path = os.path.join(log_dir, "output.log")
-            sys.stdout = CustomTeeLogger(log_file_path)
-            sys.stderr = sys.stdout
+            # Activate file writing: flushes memory buffer to disk and hooks live stdout
+            logger.activate_file_logging(os.path.join('./test_results', setting))
 
             print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
             exp.train(setting)
 
             print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
             exp.test(setting)
+
+            # Close the file stream cleanly before starting the next loop index
+            logger.deactivate_file_logging()
+
             if args.use_gpu:
                 if args.gpu_type == 'mps':
                     torch.backends.mps.empty_cache()
@@ -282,32 +313,13 @@ if __name__ == '__main__':
                     + f'_expand{args.expand}_dc{args.d_conv}_nk{args.num_kernels}' \
                     + f'_tvdt{args.tv_dt}_tvB{args.tv_B}_tvC{args.tv_C}_useD{int(args.use_D)}_{args.des}_{ii}'
 
-        log_dir = os.path.join('./test_results', setting)
-        os.makedirs(log_dir, exist_ok=True)
-
-        # Create log Folder and redirect stream outputs here
-        class CustomTeeLogger(object):
-            def __init__(self, filepath):
-                self.terminal = sys.stdout
-                self.log = open(filepath, "a", encoding="utf-8")
-
-            def write(self, message):
-                self.terminal.write(message)
-                self.log.write(message)
-                self.log.flush()  # Forces real-time streaming
-
-            def flush(self):
-                self.terminal.flush()
-                self.log.flush()
-
-
-        # Redirect stdout and stderr straight to the log folder
-        log_file_path = os.path.join(log_dir, "output.log")
-        sys.stdout = CustomTeeLogger(log_file_path)
-        sys.stderr = sys.stdout
+        logger.activate_file_logging(os.path.join('./test_results', setting))
 
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
         exp.test(setting, test=1)
+
+        logger.deactivate_file_logging()
+
         if args.use_gpu:
             if args.gpu_type == 'mps':
                 torch.backends.mps.empty_cache()
