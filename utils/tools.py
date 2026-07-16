@@ -122,7 +122,8 @@ def cal_accuracy(y_pred, y_true):
 
 def plot_loss_curves(train_losses, vali_losses, test_losses, checkpoints_dir, results_dir, setting, model_name):
     """
-    Saves plots for training, validation, and test loss curves based on passed directories.
+    Plots training and validation loss curves visually, while saving a complete
+    history (including test loss) in a CSV file to both checkpoints and results folders.
     """
 
     # Resolve dynamic paths from the arguments passed
@@ -147,11 +148,10 @@ def plot_loss_curves(train_losses, vali_losses, test_losses, checkpoints_dir, re
     df.to_csv(os.path.join(results_path, 'loss_history.csv'), index=False)
     print(f"Saved complete loss metrics CSV to checkpoints and test_results.")
 
-    # Generate and save the plot with all three curves
+    # Generate and save the plot of training and validation curves
     plt.figure(figsize=(10, 5))
     plt.plot(df['epoch'], df['train_loss'], label='Training Loss', color='blue', linewidth=2)
     plt.plot(df['epoch'], df['vali_loss'], label='Validation Loss', color='orange', linewidth=2)
-    plt.plot(df['epoch'], df['test_loss'], label='Test Loss', color='green', linewidth=2, linestyle='--')
 
     plt.title(f'Loss Trajectory - {model_name}', fontsize=14, fontweight='bold')
     plt.xlabel('Epochs', fontsize=12)
