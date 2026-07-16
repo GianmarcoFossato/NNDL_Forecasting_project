@@ -47,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--anomaly_ratio', type=float, default=0.25, help='prior anomaly ratio (%%)')
 
     # model define
-    parser.add_argument('--revin', type=int, default=1, help='whether to apply RevIN (1: enable, 0: disable)')
+    parser.add_argument('--revin', type=int, default=0, help='whether to apply RevIN (1: enable, 0: disable)')
     parser.add_argument('--expand', type=int, default=2, help='expansion factor for Mamba')
     parser.add_argument('--d_conv', type=int, default=4, help='conv kernel size for Mamba')
     parser.add_argument('--tv_dt', type=int, default=0, help='whether to use time variant dt for MambaSL')

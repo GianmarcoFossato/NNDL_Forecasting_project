@@ -94,8 +94,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             scaler = torch.cuda.amp.GradScaler()
 
         # Initialize metric history lists
-        train_losses = []
-        vali_losses = []
+        train_loss_history = []
+        vali_loss_history = []
+        test_loss_history = []
 
         for epoch in range(self.args.train_epochs):
             iter_count = 0
@@ -159,8 +160,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
 
             # Store metrics at the end of the epoch
-            train_losses.append(train_loss)
-            vali_losses.append(vali_loss)
+            train_loss_history.append(train_loss)
+            vali_loss_history.append(vali_loss)
+            test_loss_history.append(test_loss)
 
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
@@ -171,9 +173,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             # Generate loss plots
             plot_loss_curves(
-                train_losses=train_losses,
-                vali_losses=vali_losses,
+                train_losses=train_loss_history,
+                vali_losses=vali_loss_history,
+                test_losses=test_loss_history,
                 checkpoints_dir=self.args.checkpoints,
+                results_dir='./test_results',
                 setting=setting,
                 model_name=self.args.model
             )

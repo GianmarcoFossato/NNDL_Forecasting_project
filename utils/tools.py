@@ -120,33 +120,38 @@ def cal_accuracy(y_pred, y_true):
     return np.mean(y_pred == y_true)
 
 
-def plot_loss_curves(train_losses, vali_losses, checkpoints_dir, setting, model_name):
+def plot_loss_curves(train_losses, vali_losses, test_losses, checkpoints_dir, results_dir, setting, model_name):
     """
-    Plots training & validation loss curves and saves both the chart and raw data.
+    Saves plots for training, validation, and test loss curves based on passed directories.
     """
-    import os
-    import matplotlib.pyplot as plt
-    import pandas as pd
 
-    # Determine the save directory path
-    folder_path = os.path.join(checkpoints_dir, setting)
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+    # Resolve dynamic paths from the arguments passed
+    checkpoint_path = os.path.join(checkpoints_dir, setting)
+    results_path = os.path.join(results_dir, setting)
 
-    # Save raw loss values to a CSV file for reproducibility
+    # Ensure both target directories exist
+    for path in [checkpoint_path, results_path]:
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    # Structure the complete dataframe including the test loss
     df = pd.DataFrame({
         'epoch': range(1, len(train_losses) + 1),
         'train_loss': train_losses,
-        'vali_loss': vali_losses
+        'vali_loss': vali_losses,
+        'test_loss': test_losses
     })
-    csv_path = os.path.join(folder_path, 'loss_history.csv')
-    df.to_csv(csv_path, index=False)
-    print(f"Saved raw loss metrics to: {csv_path}")
 
-    # Generate and save the plot
+    # Save CSV to both folders
+    df.to_csv(os.path.join(checkpoint_path, 'loss_history.csv'), index=False)
+    df.to_csv(os.path.join(results_path, 'loss_history.csv'), index=False)
+    print(f"Saved complete loss metrics CSV to checkpoints and test_results.")
+
+    # Generate and save the plot with all three curves
     plt.figure(figsize=(10, 5))
     plt.plot(df['epoch'], df['train_loss'], label='Training Loss', color='blue', linewidth=2)
     plt.plot(df['epoch'], df['vali_loss'], label='Validation Loss', color='orange', linewidth=2)
+    plt.plot(df['epoch'], df['test_loss'], label='Test Loss', color='green', linewidth=2, linestyle='--')
 
     plt.title(f'Loss Trajectory - {model_name}', fontsize=14, fontweight='bold')
     plt.xlabel('Epochs', fontsize=12)
@@ -154,7 +159,8 @@ def plot_loss_curves(train_losses, vali_losses, checkpoints_dir, setting, model_
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.legend(fontsize=11)
 
-    plot_path = os.path.join(folder_path, 'loss_curves.png')
-    plt.savefig(plot_path, bbox_inches='tight', dpi=150)
+    # Save image to both locations
+    plt.savefig(os.path.join(checkpoint_path, 'loss_curves.png'), bbox_inches='tight', dpi=150)
+    plt.savefig(os.path.join(results_path, 'loss_curves.png'), bbox_inches='tight', dpi=150)
     plt.close()
-    print(f"Saved loss curve visualization to: {plot_path}")
+    print(f"Saved loss curve visualization to checkpoints and test_results.")
