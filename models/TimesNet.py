@@ -36,6 +36,7 @@ class TimesBlock(nn.Module):
                                num_kernels=configs.num_kernels)
         )
 
+    @torch._dynamo.disable
     def forward(self, x):
         B, T, N = x.size()
         period_list, period_weight = FFT_for_Period(x, self.k)

@@ -110,7 +110,6 @@ python -u run.py \
   --c_out 321 \
   --des 'Exp' \
   --itr 1 \
-  --batch_size $BATCH_SIZE \
   --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_4}/output.log"
 
 echo "All DLinear training jobs completed."
