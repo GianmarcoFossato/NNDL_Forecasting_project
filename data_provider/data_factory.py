@@ -1,10 +1,7 @@
 from data_provider.data_loader import Dataset_Custom
-from data_provider.uea import collate_fn
 from torch.utils.data import DataLoader
 
-data_dict = {
-    'custom': Dataset_Custom,
-}
+data_dict = {'custom': Dataset_Custom}
 
 
 def data_provider(args, flag):
@@ -15,7 +12,6 @@ def data_provider(args, flag):
     drop_last = False
     batch_size = args.batch_size
     freq = args.freq
-
 
     data_set = Data(
         args = args,

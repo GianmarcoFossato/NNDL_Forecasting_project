@@ -1,16 +1,20 @@
 # export CUDA_VISIBLE_DEVICES=0
 model_name=TimesNet
 
-# Tailored for 4 CPU cores and 96GB VRAM
-BATCH_SIZE=256
-WORKERS=4
+BATCH_SIZE=32
+WORKERS=1
+
+# RUN 1: ECL_96_96
+ID_1="ECL_96_96"
+SETTING_1="long_term_forecast_${ID_1}_${model_name}_custom_ftM_sl96_ll48_pl96_dm256_nh8_el2_dl1_df512_expand2_dc4_fc3_ebtimeF_dtTrue_Exp_0"
+mkdir -p "./test_results/${SETTING_1}"
 
 python -u run.py \
   --task_name long_term_forecast \
   --is_training 1 \
   --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
-  --model_id ECL_96_96 \
+  --model_id $ID_1 \
   --model $model_name \
   --data custom \
   --features M \
@@ -27,16 +31,21 @@ python -u run.py \
   --d_ff 512 \
   --top_k 5 \
   --des 'Exp' \
-  --itr 1  \
+  --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS > "./test_results/${SETTING_1}/output.log" 2>&1
+
+# RUN 2: ECL_96_192
+ID_2="ECL_96_192"
+SETTING_2="long_term_forecast_${ID_2}_${model_name}_custom_ftM_sl96_ll48_pl192_dm256_nh8_el2_dl1_df512_expand2_dc4_fc3_ebtimeF_dtTrue_Exp_0"
+mkdir -p "./test_results/${SETTING_2}"
 
 python -u run.py \
   --task_name long_term_forecast \
   --is_training 1 \
   --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
-  --model_id ECL_96_192 \
+  --model_id $ID_2 \
   --model $model_name \
   --data custom \
   --features M \
@@ -55,14 +64,19 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS > "./test_results/${SETTING_2}/output.log" 2>&1
+
+# RUN 3: ECL_96_336
+ID_3="ECL_96_336"
+SETTING_3="long_term_forecast_${ID_3}_${model_name}_custom_ftM_sl96_ll48_pl336_dm256_nh8_el2_dl1_df512_expand2_dc4_fc3_ebtimeF_dtTrue_Exp_0"
+mkdir -p "./test_results/${SETTING_3}"
 
 python -u run.py \
   --task_name long_term_forecast \
   --is_training 1 \
   --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
-  --model_id ECL_96_336 \
+  --model_id $ID_3 \
   --model $model_name \
   --data custom \
   --features M \
@@ -81,14 +95,19 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS > "./test_results/${SETTING_3}/output.log" 2>&1
+
+# RUN 4: ECL_96_720
+ID_4="ECL_96_720"
+SETTING_4="long_term_forecast_${ID_4}_${model_name}_custom_ftM_sl96_ll48_pl720_dm256_nh8_el2_dl1_df512_expand2_dc4_fc3_ebtimeF_dtTrue_Exp_0"
+mkdir -p "./test_results/${SETTING_4}"
 
 python -u run.py \
   --task_name long_term_forecast \
   --is_training 1 \
   --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
-  --model_id ECL_96_720 \
+  --model_id $ID_4 \
   --model $model_name \
   --data custom \
   --features M \
@@ -107,4 +126,6 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS > "./test_results/${SETTING_4}/output.log" 2>&1
+
+echo "All training jobs completed. Logs are saved inside their respective test_results subfolders."

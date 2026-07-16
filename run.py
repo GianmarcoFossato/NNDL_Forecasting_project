@@ -47,6 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--anomaly_ratio', type=float, default=0.25, help='prior anomaly ratio (%%)')
 
     # model define
+    parser.add_argument('--revin', type=int, default=1, help='whether to apply RevIN (1: enable, 0: disable)')
     parser.add_argument('--expand', type=int, default=2, help='expansion factor for Mamba')
     parser.add_argument('--d_conv', type=int, default=4, help='conv kernel size for Mamba')
     parser.add_argument('--tv_dt', type=int, default=0, help='whether to use time variant dt for MambaSL')
@@ -188,7 +189,7 @@ if __name__ == '__main__':
         for ii in range(args.itr):
             # setting record of experiments
             exp = Exp(args)  # set experiments
-            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}'.format(
+            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}_revin{}'.format(
                 args.task_name,
                 args.model_id,
                 args.model,
@@ -207,7 +208,7 @@ if __name__ == '__main__':
                 args.factor,
                 args.embed,
                 args.distil,
-                args.des, ii)
+                args.des, ii, args.revin)
             
             # Override setting for specific model to ensure proper checkpoint naming and logging
             if args.model == 'MambaSingleLayer' and args.task_name == 'classification':
@@ -229,7 +230,7 @@ if __name__ == '__main__':
     else:
         exp = Exp(args)  # set experiments
         ii = 0
-        setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}'.format(
+        setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}_revin{}'.format(
             args.task_name,
             args.model_id,
             args.model,
@@ -248,7 +249,7 @@ if __name__ == '__main__':
             args.factor,
             args.embed,
             args.distil,
-            args.des, ii)
+            args.des, ii, args.revin)
         
         # Override setting for specific model to ensure proper checkpoint naming and logging
         if args.model == 'MambaSingleLayer' and args.task_name == 'classification':

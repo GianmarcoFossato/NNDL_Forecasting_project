@@ -118,3 +118,43 @@ def adjustment(gt, pred):
 
 def cal_accuracy(y_pred, y_true):
     return np.mean(y_pred == y_true)
+
+
+def plot_loss_curves(train_losses, vali_losses, checkpoints_dir, setting, model_name):
+    """
+    Plots training & validation loss curves and saves both the chart and raw data.
+    """
+    import os
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    # Determine the save directory path
+    folder_path = os.path.join(checkpoints_dir, setting)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    # Save raw loss values to a CSV file for reproducibility
+    df = pd.DataFrame({
+        'epoch': range(1, len(train_losses) + 1),
+        'train_loss': train_losses,
+        'vali_loss': vali_losses
+    })
+    csv_path = os.path.join(folder_path, 'loss_history.csv')
+    df.to_csv(csv_path, index=False)
+    print(f"Saved raw loss metrics to: {csv_path}")
+
+    # Generate and save the plot
+    plt.figure(figsize=(10, 5))
+    plt.plot(df['epoch'], df['train_loss'], label='Training Loss', color='blue', linewidth=2)
+    plt.plot(df['epoch'], df['vali_loss'], label='Validation Loss', color='orange', linewidth=2)
+
+    plt.title(f'Loss Trajectory - {model_name}', fontsize=14, fontweight='bold')
+    plt.xlabel('Epochs', fontsize=12)
+    plt.ylabel('Loss Value', fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend(fontsize=11)
+
+    plot_path = os.path.join(folder_path, 'loss_curves.png')
+    plt.savefig(plot_path, bbox_inches='tight', dpi=150)
+    plt.close()
+    print(f"Saved loss curve visualization to: {plot_path}")

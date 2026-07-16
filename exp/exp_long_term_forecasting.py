@@ -1,6 +1,6 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from utils.tools import EarlyStopping, adjust_learning_rate, visual
+from utils.tools import EarlyStopping, adjust_learning_rate, visual, plot_loss_curves
 from utils.metrics import metric
 import torch
 import torch.nn as nn
@@ -93,6 +93,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
 
+        # Initialize metric history lists
+        train_losses = []
+        vali_losses = []
+
         for epoch in range(self.args.train_epochs):
             iter_count = 0
             train_loss = []
@@ -153,12 +157,26 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+
+            # Store metrics at the end of the epoch
+            train_losses.append(train_loss)
+            vali_losses.append(vali_loss)
+
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
 
             adjust_learning_rate(model_optim, epoch + 1, self.args)
+
+            # Generate loss plots
+            plot_loss_curves(
+                train_losses=train_losses,
+                vali_losses=vali_losses,
+                checkpoints_dir=self.args.checkpoints,
+                setting=setting,
+                model_name=self.args.model
+            )
 
         best_model_path = path + '/' + 'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))

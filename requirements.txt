@@ -7,4 +7,6 @@ scikit-learn
 matplotlib
 tqdm
 scipy
+datasets
+huggingface_hub
 gdown
