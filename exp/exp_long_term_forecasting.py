@@ -28,7 +28,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         # Compiles the model. This fuses operations together to reduce GPU memory bandwidth usage and speed up execution
         if torch.cuda.is_available():
             print("Compiling model for GPU optimization...")
-            model = torch.compile(model)
+            torch._dynamo.config.capture_scalar_outputs = True
+            model = torch.compile(model, dynamic=True)
         return model
 
     def _get_data(self, flag):

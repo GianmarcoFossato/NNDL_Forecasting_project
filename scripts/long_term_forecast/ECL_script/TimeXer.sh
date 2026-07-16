@@ -6,7 +6,7 @@ WORKERS=0
 
 # RUN 1: ECL_96_96
 ID_1="ECL_96_96"
-SETTING_1="long_term_forecast_${ID_1}_${model_name}_custom_ftM_sl96_ll48_pl96_el4_fc3_df512_Exp_0"
+SETTING_1="long_term_forecast_${ID_1}_${model_name}_custom_ftM_sl96_ll48_pl96_el4_fc3_df512_Exp_0_revin0"
 mkdir -p "./test_results/${SETTING_1}"
 
 python -u run.py \
@@ -30,11 +30,11 @@ python -u run.py \
   --d_ff 512 \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_1}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_1}/output.log"
 
 # RUN 2: ECL_96_192
 ID_2="ECL_96_192"
-SETTING_2="long_term_forecast_${ID_2}_${model_name}_custom_ftM_sl96_ll48_pl192_el3_fc3_Exp_0"
+SETTING_2="long_term_forecast_${ID_2}_${model_name}_custom_ftM_sl96_ll48_pl192_el3_fc3_Exp_0_revin0"
 mkdir -p "./test_results/${SETTING_2}"
 
 python -u run.py \
@@ -57,11 +57,11 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_2}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_2}/output.log"
 
 # RUN 3: ECL_96_336
 ID_3="ECL_96_336"
-SETTING_3="long_term_forecast_${ID_3}_${model_name}_custom_ftM_sl96_ll48_pl336_el4_fc3_Exp_0"
+SETTING_3="long_term_forecast_${ID_3}_${model_name}_custom_ftM_sl96_ll48_pl336_el4_fc3_Exp_0_revin0"
 mkdir -p "./test_results/${SETTING_3}"
 
 python -u run.py \
@@ -84,11 +84,11 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_3}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_3}/output.log"
 
 # RUN 4: ECL_96_720
 ID_4="ECL_96_720"
-SETTING_4="long_term_forecast_${ID_4}_${model_name}_custom_ftM_sl96_ll48_pl720_el3_fc3_Exp_0"
+SETTING_4="long_term_forecast_${ID_4}_${model_name}_custom_ftM_sl96_ll48_pl720_el3_fc3_Exp_0_revin0"
 mkdir -p "./test_results/${SETTING_4}"
 
 python -u run.py \
@@ -111,6 +111,6 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_4}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_4}/output.log"
 
 echo "All TimeXer training jobs completed."

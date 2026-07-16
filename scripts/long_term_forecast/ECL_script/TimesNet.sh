@@ -33,7 +33,7 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_1}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_1}/output.log"
 
 # RUN 2: ECL_96_192
 ID_2="ECL_96_192"
@@ -64,7 +64,7 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_2}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_2}/output.log"
 
 # RUN 3: ECL_96_336
 ID_3="ECL_96_336"
@@ -95,7 +95,7 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_3}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_3}/output.log"
 
 # RUN 4: ECL_96_720
 ID_4="ECL_96_720"
@@ -126,6 +126,6 @@ python -u run.py \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS > "./test_results/${SETTING_4}/output.log" 2>&1
+  --num_workers $WORKERS 2>&1 | tee "./test_results/${SETTING_4}/output.log"
 
 echo "All training jobs completed. Logs are saved inside their respective test_results subfolders."
