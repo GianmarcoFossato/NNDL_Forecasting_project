@@ -2,7 +2,7 @@
 model_name=TimesNet
 
 BATCH_SIZE=32
-WORKERS=1
+WORKERS=0
 
 # RUN 1: ECL_96_96
 ID_1="ECL_96_96"

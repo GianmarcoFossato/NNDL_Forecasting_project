@@ -24,6 +24,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         if self.args.use_multi_gpu and self.args.use_gpu:
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
+
+        # Compiles the model. This fuses operations together to reduce GPU memory bandwidth usage and speed up execution
+        if torch.cuda.is_available():
+            print("Compiling model for GPU optimization...")
+            model = torch.compile(model)
         return model
 
     def _get_data(self, flag):
