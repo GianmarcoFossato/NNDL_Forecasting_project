@@ -165,6 +165,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
 
+            # Optuna pruning block
+            if hasattr(self.args, 'trial') and self.args.trial is not None:
+                import optuna
+                self.args.trial.report(vali_loss, epoch)
+                if self.args.trial.should_prune():
+                    print(f"➔ Trial pruned early at epoch {epoch + 1} due to poor validation performance.")
+                    raise optuna.TrialPruned()
+            
             # Store metrics at the end of the epoch
             train_loss_history.append(train_loss)
             vali_loss_history.append(vali_loss)

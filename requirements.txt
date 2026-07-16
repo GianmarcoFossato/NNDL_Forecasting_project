@@ -10,3 +10,5 @@ scipy
 datasets
 huggingface_hub
 gdown
+optuna
+optuna-dashboard
