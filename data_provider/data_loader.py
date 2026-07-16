@@ -107,8 +107,8 @@ class Dataset_Custom(Dataset):
 
         # Preload to GPU (only possible because Electrcity dataset is not too large)
 
-        # Convert NumPy arrays to PyTorch tensors and move them directly to VRAM
-        if torch.cuda.is_available(): # Comment this "if" block to go back to original setup
+        # Convert NumPy arrays to PyTorch tensors and move them directly to VRAM (possible only if using one worker)
+        if torch.cuda.is_available() and self.args.num_workers == 0: # Comment this "if" block to go back to original setup
             print("Preloading dataset directly to GPU VRAM...")
             self.data_x = torch.tensor(self.data_x, dtype=torch.float32).cuda()
             self.data_y = torch.tensor(self.data_y, dtype=torch.float32).cuda()
