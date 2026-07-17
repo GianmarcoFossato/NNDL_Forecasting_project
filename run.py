@@ -336,5 +336,5 @@ if __name__ == '__main__':
             elif args.gpu_type == 'cuda':
                 torch.cuda.empty_cache()
 
-        if args.compile:
-            setting += '_compile'
+        if args.no_compile:
+            setting += '_no_compile'
