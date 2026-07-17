@@ -33,7 +33,7 @@ python -u run.py \
   --itr 1 \
   --batch_size $BATCH_SIZE\
   --num_workers $WORKERS\
-  --compile
+  --no-compile
 
 # RUN 2: ECL_96_192
 ID_2="ECL_96_192"
@@ -64,7 +64,7 @@ python -u run.py \
   --itr 1 \
   --batch_size $BATCH_SIZE\
   --num_workers $WORKERS\
-  --compile
+  --no-compile
 
 # RUN 3: ECL_96_336
 ID_3="ECL_96_336"
@@ -95,7 +95,7 @@ python -u run.py \
   --itr 1 \
   --batch_size $BATCH_SIZE\
   --num_workers $WORKERS\
-  --compile
+  --no-compile
 
 # RUN 4: ECL_96_720
 ID_4="ECL_96_720"
@@ -126,6 +126,6 @@ python -u run.py \
   --itr 1 \
   --batch_size $BATCH_SIZE \
   --num_workers $WORKERS\
-  --compile
+  --no-compile
 
 echo "All ${model_name} training jobs completed."
