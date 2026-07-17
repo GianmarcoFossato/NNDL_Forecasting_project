@@ -10,4 +10,5 @@ tqdm
 scipy
 datasets
 huggingface_hub
+optuna
 gdown

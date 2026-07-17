@@ -3,6 +3,7 @@ import os
 import sys
 import io
 import torch.backends
+from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
 from utils.print_args import print_args
 import random
 import numpy as np
@@ -52,14 +53,8 @@ class OutputLogger(object):
         if self.log_file:
             self.log_file.flush()
 
-if __name__ == '__main__':
-    logger = OutputLogger()
 
-    fix_seed = 2021
-    random.seed(fix_seed)
-    torch.manual_seed(fix_seed)
-    np.random.seed(fix_seed)
-
+def init_parser():
     parser = argparse.ArgumentParser(description='TimesNet')
 
     # basic config
@@ -88,14 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('--seasonal_patterns', type=str, default='Monthly', help='subset for M4')
     parser.add_argument('--inverse', action='store_true', help='inverse output data', default=False)
 
-    # inputation task
-    parser.add_argument('--mask_rate', type=float, default=0.25, help='mask ratio')
-
-    # anomaly detection task
-    parser.add_argument('--anomaly_ratio', type=float, default=0.25, help='prior anomaly ratio (%%)')
-
     # model define
-    parser.add_argument('--revin', action='store_true', help='whether to apply RevIN', default=True)
     parser.add_argument('--expand', type=int, default=2, help='expansion factor for Mamba')
     parser.add_argument('--d_conv', type=int, default=4, help='conv kernel size for Mamba')
     parser.add_argument('--tv_dt', type=int, default=0, help='whether to use time variant dt for MambaSL')
@@ -132,6 +120,7 @@ if __name__ == '__main__':
                         help='down sampling method, only support avg, max, conv')
     parser.add_argument('--seg_len', type=int, default=96,
                         help='the length of segmen-wise iteration of SegRNN')
+    parser.add_argument('--revin', action='store_true', help='whether to apply RevIN', default=True)
 
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
@@ -153,6 +142,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
     parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
     parser.add_argument('--no_compile', action='store_false', help='disable torch.compile optimization', default=True)
+
     # de-stationary projector params
     parser.add_argument('--p_hidden_dims', type=int, nargs='+', default=[128, 128],
                         help='hidden layer dimensions of projector (List)')
@@ -205,7 +195,22 @@ if __name__ == '__main__':
     parser.add_argument('--top_p', type=float, default=0.5, help='Dynamic Routing in MoE')
     parser.add_argument('--pos', type=int, choices=[0, 1], default=1, help='Positional Embedding. Set pos to 0 or 1')
 
+    # Tune configs file
+    parser.add_argument('--path_to_hp_config', type=str, default=None, help='Path to hyperparameter config file (json)')
+
+    return parser
+
+if __name__ == '__main__':
+    logger = OutputLogger()
+
+    fix_seed = 2021
+    random.seed(fix_seed)
+    torch.manual_seed(fix_seed)
+    np.random.seed(fix_seed)
+
+    parser = init_parser()
     args = parser.parse_args()
+
     if torch.cuda.is_available() and args.use_gpu:
         args.device = torch.device('cuda:{}'.format(args.gpu))
         print('Using GPU')
@@ -225,13 +230,7 @@ if __name__ == '__main__':
     print('Args in experiment:')
     print_args(args)
 
-
-    if args.task_name == 'long_term_forecast':
-        from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
-        Exp = Exp_Long_Term_Forecast
-    else:
-        from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
-        Exp = Exp_Long_Term_Forecast
+    Exp = Exp_Long_Term_Forecast
 
     if args.is_training:
         for ii in range(args.itr):

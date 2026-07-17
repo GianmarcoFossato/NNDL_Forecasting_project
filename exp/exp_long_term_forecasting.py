@@ -11,6 +11,7 @@ import warnings
 import numpy as np
 from utils.dtw_metric import dtw, accelerated_dtw
 from utils.augmentation import run_augmentation, run_augmentation_single
+import optuna
 
 warnings.filterwarnings('ignore')
 
@@ -44,7 +45,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
     def _select_criterion(self):
         criterion = nn.MSELoss()
         return criterion
-
 
     def vali(self, vali_data, vali_loader, criterion):
         total_loss = []
@@ -80,7 +80,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         self.model.train()
         return total_loss
 
-    def train(self, setting):
+    def train(self, setting, trial=None, save_ckp=True):
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
@@ -92,7 +92,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         time_now = time.time()
 
         train_steps = len(train_loader)
-        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
+        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True, save_ckp=save_ckp)
 
         model_optim = self._select_optimizer()
         criterion = self._select_criterion()
@@ -166,12 +166,21 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
 
-            # Store metrics at the end of the epoch
+            # Store metrics at the end of the epoch (for results output)
             train_loss_history.append(train_loss)
             vali_loss_history.append(vali_loss)
             test_loss_history.append(test_loss)
 
             early_stopping(vali_loss, self.model, path)
+
+            # If Optuna trial is provided, report to Optuna and check for pruning
+            if trial is not None:
+                trial.report(vali_loss, epoch)
+
+                if trial.should_prune():
+                    print(f"Trial {trial.number} pruned at epoch {epoch}")
+                    raise optuna.exceptions.TrialPruned()
+
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
