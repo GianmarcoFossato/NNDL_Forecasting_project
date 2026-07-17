@@ -132,11 +132,6 @@ bash ./scripts/classification/TimesNet.sh
 - Add the model file to the folder `./models`. You can follow the `./models/Transformer.py`.
 - Create the corresponding scripts under the folder `./scripts`.
 
-### Note: 
-
-(1) About classification: Since we include all five tasks in a unified code base, the accuracy of each subtask may fluctuate but the average performance can be reproduced (even a bit better). We have provided the reproduced checkpoints [here](https://github.com/thuml/Time-Series-Library/issues/494).
-
-(2) About anomaly detection: Some discussion about the adjustment strategy in anomaly detection can be found [here](https://github.com/thuml/Anomaly-Transformer/issues/14). The key point is that the adjustment strategy corresponds to an event-level metric.
 
 ### Inspect the project structure:
 
@@ -148,20 +143,13 @@ Time-Series-Library/
 ├── run.py                        # Unified entry that parses args and dispatches tasks
 ├── exp/                          # Task pipelines wrapping train/val/test
 │   ├── exp_basic.py              # Experiment base class, registers models, builds flows
-│   ├── exp_long_term_forecasting.py    # Long-term forecasting logic
-│   ├── exp_short_term_forecasting.py   # Short-term forecasting logic
-│   ├── exp_imputation.py               # Missing-value imputation
-│   ├── exp_anomaly_detection.py        # Anomaly detection
-│   ├── exp_classification.py           # Classification
-│   └── exp_zero_shot_forecasting.py    # LTSM zero-shot evaluation
+│   └── exp_long_term_forecasting.py    # Long-term forecasting logic
 ├── data_provider/                # Dataset loaders and splits
 │   ├── data_factory.py           # Chooses the proper DataLoader per task
 │   ├── data_loader.py            # Generic TS reader with sliding-window logic
-│   ├── uea.py / m4.py            # Parsers for UEA, M4 and other formats
 │   └── __init__.py               # Exposes factory interfaces upward
 ├── models/                       # All model implementations
 │   ├── TimesNet.py, TimeMixer.py # Main forecasting models
-│   ├── Chronos2.py, TiRex.py     # LTSM zero-shot models
 │   └── __init__.py               # Enables name-based instantiation inside exp
 ├── layers/                       # Reusable attention / conv / embedding blocks
 │   ├── Transformer_EncDec.py     # Transformer stacks
@@ -174,15 +162,8 @@ Time-Series-Library/
 │   ├── augmentation.py           # Augmentations for classification / detection
 │   ├── print_args.py             # Unified argument printer
 │   └── masking.py / losses.py    # Task-specific helpers
-├── scripts/                      # Bash recipes for reproducible experiments
-│   ├── long_term_forecast/       # Long-term forecasting per dataset/model
-│   ├── short_term_forecast/      # M4 and other short-term scripts
-│   ├── imputation/               # Imputation scripts
-│   ├── anomaly_detection/        # SMD / SMAP / SWAT detection scripts
-│   ├── classification/           # UEA classification scripts
-│   └── exogenous_forecast/       # TimeXer exogenous forecasting flow
-├── tutorial/                     # TimesNet tutorial notebook and figures
-└── pic/                          # README figures (dataset overview, etc.)
+└── scripts/                      # Bash recipes for reproducible experiments
+    └── long_term_forecast/       # Long-term forecasting per dataset/model
 ```
 
 ### Understand the project architecture:
