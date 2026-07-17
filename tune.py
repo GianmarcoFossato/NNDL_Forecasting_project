@@ -103,6 +103,9 @@ def objective_func(trial, args, hp_configs):
 
     except Exception as e:
         print(f"Trial {trial.number} failed with error: {str(e)}")
+
+        os.makedirs('hp_results', exist_ok=True)
+
         # Log error details
         with open('hp_results/failed_trials.log', 'a') as f:
             f.write(f"Trial {trial.number} failed:\n")
