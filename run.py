@@ -152,7 +152,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_type', type=str, default='cuda', help='gpu type')  # cuda or mps
     parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
     parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
-    parser.add_argument('--no_compile', action='store_false', dest='compile', help='disable torch.compile optimization', default=True)
+    parser.add_argument('--no_compile', action='store_false', help='disable torch.compile optimization', default=True)
     # de-stationary projector params
     parser.add_argument('--p_hidden_dims', type=int, nargs='+', default=[128, 128],
                         help='hidden layer dimensions of projector (List)')
