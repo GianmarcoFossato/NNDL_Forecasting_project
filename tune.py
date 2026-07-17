@@ -5,12 +5,12 @@ from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
 import random
 import numpy as np
 from datetime import datetime
-from run import init_parser
+from run import init_parser, OutputLogger
 from optuna.pruners import SuccessiveHalvingPruner
 from functools import partial
 import json
-
 import shutil
+import sys
 
 
 def save_trials_callback(study, trial):
@@ -66,19 +66,23 @@ def suggest_params(trial, args, hp_configs):
     #     args.dims = torch.ones(args.e_layers, dtype=torch.int32).tolist() * args.d_model
     #     args.dw_dims = torch.ones(args.e_layers, dtype=torch.int32).tolist() * args.d_model
 
-        # Fix the feedforward dimension to be equal to d_model for the HP search
+    # Fix the feedforward dimension to be equal to d_model for the HP search
     args.d_ff = args.d_model
     return args
 
 
-# Define the objective function
-def objective_func(trial, args, hp_configs):
+def objective_func(trial, args, hp_configs, logger):
+    setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
+
+    # ACTIVATE LOG WRITING FOR THIS TRIAL
+    log_dir = os.path.join('./hp_results/logs', setting)
+    logger.activate_file_logging(log_dir)
+
     try:
         # collect suggested hyperparameters
         args = suggest_params(trial, args, hp_configs)
-
         exp = Exp_Long_Term_Forecast(args)
-        setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
+        #setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
 
         print(f"Starting trial {trial.number}")
         exp.train(setting, trial)
@@ -90,10 +94,10 @@ def objective_func(trial, args, hp_configs):
         print(f"Trial {trial.number} validation loss: {val_loss}")
 
         # Clean up any leftover files/resources
-        setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
-        cleanup_path = os.path.join('./checkpoints/', setting)
-        if os.path.exists(cleanup_path):
-            shutil.rmtree(cleanup_path)
+        # setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
+        # cleanup_path = os.path.join('./checkpoints/', setting)
+        # if os.path.exists(cleanup_path):
+        #     shutil.rmtree(cleanup_path)
 
         return val_loss
 
@@ -108,20 +112,13 @@ def objective_func(trial, args, hp_configs):
 
         # Log error details
         with open('hp_results/failed_trials.log', 'a') as f:
-            f.write(f"Trial {trial.number} failed:\n")
-            f.write(f"Parameters: {trial.params}\n")
-            f.write(f"Error: {str(e)}\n\n")
-
-        # Clean up any leftover files/resources
-        setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
-        cleanup_path = os.path.join('./checkpoints/', setting)
-        if os.path.exists(cleanup_path):
-            shutil.rmtree(cleanup_path)
-
-        # Return worst possible value to ensure failed trials aren't selected
+            f.write(f"Trial {trial.number} failed:\nParameters: {trial.params}\nError: {str(e)}\n\n")
         return float('inf')
 
     finally:
+        # Deactivate file logging cleanly
+        logger.deactivate_file_logging()
+
         cleanup_path = os.path.join('./checkpoints/', setting)
         if os.path.exists(cleanup_path):
             shutil.rmtree(cleanup_path)
@@ -135,13 +132,15 @@ def set_seed(seed):
 
 
 if __name__ == '__main__':
+    # Initialize the custom OutputLogger from run.py to catch logs
+    logger = OutputLogger()
+
     hp_seed = 2021
     test_seed = hp_seed
     set_seed(hp_seed)
 
     parser = init_parser()
     args = parser.parse_args()
-
     args.use_gpu = True if torch.cuda.is_available() else False
 
     # Handle multi-GPU setup if needed
@@ -172,31 +171,40 @@ if __name__ == '__main__':
         min_early_stopping_rate=hp_configs["min_early_stopping_rate"]
     )
 
-    study = optuna.create_study(direction='minimize', pruner=pruner)
+    # Persistent SQLite file for later visualization
+    db_dir = 'hp_results'
+    os.makedirs(db_dir, exist_ok=True)
+    storage_url = f"sqlite:///{os.path.join(db_dir, 'optuna_study.db')}"
+    study_name = f"hp_search_{args.model_id}_{args.model}"
 
-    # Set the objective
-    objective = partial(objective_func, args=args, hp_configs=hp_configs)
+    study = optuna.create_study(
+        study_name=study_name,
+        storage=storage_url,
+        direction='minimize',
+        pruner=pruner,
+        load_if_exists=True  # Allows resuming optimization seamlessly
+    )
 
-    # Start the optimization
+    # Pass logger instance down to the objective callback
+    objective = partial(objective_func, args=args, hp_configs=hp_configs, logger=logger)
     study.optimize(objective, n_trials=hp_configs["n_trials"], callbacks=[save_trials_callback])
 
     # Output the best hyperparameters
     print('Number of finished trials:', len(study.trials))
     print('Best trial:')
     trial = study.best_trial
-
     print('  Value:', trial.value)
-    print('  Params:')
-    for key, value in trial.params.items():
-        print(f'    {key}: {value}')
 
-    # Retrain the model with the best hyperparameters
-    for param_name, param_value in trial.params.items():
-        setattr(args, param_name, param_value)
+    # Retrain Phase logs
+    logger.activate_file_logging(os.path.join('./hp_results/logs', f'final_retrain_{study_name}'))
+
+    for key, value in trial.params.items():
+        setattr(args, key, value)
 
     args.d_ff = args.d_model
     args.d_temp = args.d_model
     exp = Exp_Long_Term_Forecast(args)
+
     for ii in range(args.itr):
         test_seed += 1
         set_seed(test_seed)
@@ -224,3 +232,5 @@ if __name__ == '__main__':
 
         # Test the model
         exp.test(setting)
+
+    logger.deactivate_file_logging()
