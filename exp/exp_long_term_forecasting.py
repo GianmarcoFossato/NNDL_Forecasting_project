@@ -26,7 +26,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
 
         # Compiles the model. This fuses operations together to reduce GPU memory bandwidth usage and speed up execution
-        if torch.cuda.is_available() and getattr(self.args, 'no-compile', False):
+        if torch.cuda.is_available() and getattr(self.args, 'no_compile', False):
             print("Compiling model for GPU optimization...")
             torch._dynamo.config.capture_scalar_outputs = True
             model = torch.compile(model, dynamic=True)
