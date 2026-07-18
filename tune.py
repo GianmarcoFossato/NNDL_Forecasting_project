@@ -12,24 +12,20 @@ import json
 import shutil
 import sys
 
+# Global to track last file
+last_trial_file = None
 
 def save_trials_callback(study, trial):
     """Save trial results to CSV after each trial"""
     global last_trial_file
 
     # Create results directory
-    os.makedirs('hp_results', exist_ok=True)
+    os.makedirs('test_results', exist_ok=True)
 
-    # Delete previous file
-    if last_trial_file and os.path.exists(last_trial_file):
-        os.remove(last_trial_file)
-
-    # Save new file
+    # Save new file (overrides results)
     df = study.trials_dataframe()
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    last_trial_file = f'hp_results/trials_{args.model}_{args.model_id}.csv'
+    last_trial_file = f'test_results/trials_{args.model}_{args.model_id}.csv'
     df.to_csv(last_trial_file, index=False)
-
 
 def suggest_params(trial, args, hp_configs):
     """Use Optuna to suggest hyperparameters based on the config file.
@@ -84,7 +80,7 @@ def objective_func(trial, args, hp_configs, logger):
         exp = Exp_Long_Term_Forecast(args)
         #setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
 
-        print(f"Starting trial {trial.number}")
+        print(f">>>Starting trial {trial.number}<<<")
         exp.train(setting, trial)
 
         # Validate
@@ -108,17 +104,14 @@ def objective_func(trial, args, hp_configs, logger):
     except Exception as e:
         print(f"Trial {trial.number} failed with error: {str(e)}")
 
-        os.makedirs('hp_results', exist_ok=True)
+        os.makedirs('test_results', exist_ok=True)
 
         # Log error details
-        with open('hp_results/failed_trials.log', 'a') as f:
+        with open('test_results/failed_trials.log', 'a') as f:
             f.write(f"Trial {trial.number} failed:\nParameters: {trial.params}\nError: {str(e)}\n\n")
         return float('inf')
 
     finally:
-        # Deactivate file logging cleanly
-        logger.deactivate_file_logging()
-
         cleanup_path = os.path.join('./checkpoints/', setting)
         if os.path.exists(cleanup_path):
             shutil.rmtree(cleanup_path)
@@ -164,7 +157,7 @@ if __name__ == '__main__':
     with open(args.path_to_hp_config, 'r') as f:
         hp_configs = json.load(f)
 
-    # Initialize Optuna study with SuccessiveHalvingPruner
+    # initialize Optuna study with SuccessiveHalvingPruner
     pruner = SuccessiveHalvingPruner(
         min_resource=hp_configs["min_resource"],  # Minimum number of epochs
         reduction_factor=hp_configs["reduction_factor"],  # Factor to reduce the number of trials
@@ -172,31 +165,29 @@ if __name__ == '__main__':
     )
 
     # Persistent SQLite file for later visualization
-    db_dir = 'hp_results'
+    db_dir = 'test_results'
     os.makedirs(db_dir, exist_ok=True)
     storage_url = f"sqlite:///{os.path.join(db_dir, 'optuna_study.db')}"
     study_name = f"hp_search_{args.model_id}_{args.model}"
 
+    # create study instance
     study = optuna.create_study(
         study_name=study_name,
         storage=storage_url,
         direction='minimize',
         pruner=pruner,
-        load_if_exists=True  # Allows resuming optimization seamlessly
+        load_if_exists=True  # Allows resuming optimization
     )
 
-    # Pass logger instance down to the objective callback
+    # pass logger instance down to the objective callback
     objective = partial(objective_func, args=args, hp_configs=hp_configs, logger=logger)
     study.optimize(objective, n_trials=hp_configs["n_trials"], callbacks=[save_trials_callback])
 
-    # Output the best hyperparameters
+    # output the best hyperparameters
     print('Number of finished trials:', len(study.trials))
     print('Best trial:')
     trial = study.best_trial
     print('  Value:', trial.value)
-
-    # Retrain Phase logs
-    logger.activate_file_logging(os.path.join('./hp_results/logs', f'final_retrain_{study_name}'))
 
     for key, value in trial.params.items():
         setattr(args, key, value)
