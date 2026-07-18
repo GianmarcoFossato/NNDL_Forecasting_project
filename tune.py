@@ -4,27 +4,18 @@ import optuna
 from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
 import random
 import numpy as np
-from datetime import datetime
 from run import init_parser, OutputLogger
 from optuna.pruners import SuccessiveHalvingPruner
 from functools import partial
 import json
 import shutil
-import sys
 
-# Global to track last file
-last_trial_file = None
+def save_trials_callback(study, trial, args):
+    model_dir = f'test_results/{args.model_id}_{args.model}'
+    os.makedirs(model_dir, exist_ok=True)
 
-def save_trials_callback(study, trial):
-    """Save trial results to CSV after each trial"""
-    global last_trial_file
-
-    # Create results directory
-    os.makedirs('test_results', exist_ok=True)
-
-    # Save new file (overrides results)
     df = study.trials_dataframe()
-    last_trial_file = f'test_results/trials_{args.model}_{args.model_id}.csv'
+    last_trial_file = f'{model_dir}/trials_{args.model}_{args.model_id}.csv'
     df.to_csv(last_trial_file, index=False)
 
 def suggest_params(trial, args, hp_configs):
@@ -121,7 +112,6 @@ def set_seed(seed):
 
 
 if __name__ == '__main__':
-    # Initialize the custom OutputLogger from run.py to catch logs
     logger = OutputLogger()
 
     hp_seed = 2021
@@ -145,6 +135,12 @@ if __name__ == '__main__':
     # Global to track last file
     last_trial_file = None
 
+    # Persistent SQLite file for later visualization
+    study_folder = f"{args.model_id}_{args.model}"
+    db_dir = os.path.join('test_results', study_folder)
+    os.makedirs(db_dir, exist_ok=True)
+    logger.activate_file_logging(db_dir)
+
     # check if args.path_to_hp_config is provided
     if args.path_to_hp_config is None:
         raise ValueError("Provide a valid path to the hyperparameter config file using --path_to_hp_config")
@@ -160,9 +156,6 @@ if __name__ == '__main__':
         min_early_stopping_rate=hp_configs["min_early_stopping_rate"]
     )
 
-    # Persistent SQLite file for later visualization
-    db_dir = 'test_results'
-    os.makedirs(db_dir, exist_ok=True)
     storage_url = f"sqlite:///{os.path.join(db_dir, 'optuna_study.db')}"
     study_name = f"hp_search_{args.model_id}_{args.model}"
 
@@ -176,8 +169,9 @@ if __name__ == '__main__':
     )
 
     # pass logger instance down to the objective callback
+    bound_callback = partial(save_trials_callback, args=args)
     objective = partial(objective_func, args=args, hp_configs=hp_configs, logger=logger)
-    study.optimize(objective, n_trials=hp_configs["n_trials"], callbacks=[save_trials_callback])
+    study.optimize(objective, n_trials=hp_configs["n_trials"], callbacks=[bound_callback])
 
     # output the best hyperparameters
     print('Number of finished trials:', len(study.trials))
