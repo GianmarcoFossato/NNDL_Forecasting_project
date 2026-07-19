@@ -3,10 +3,7 @@ import torch.nn as nn
 from layers.Embed import DataEmbedding
 from layers.Hybrid_EncDec import HybridEncoderLayer
 from layers.ConvNeXtBlock2D import ConvNeXtBlock2D
-
-
-# Make sure to import RevIN correctly from your repo structure
-# from layers.RevIN import RevIN
+from layers.RevIN import RevIN
 
 class Model(nn.Module):
     """
@@ -53,7 +50,7 @@ class Model(nn.Module):
         # x_enc: [B, T, N]
         B, T, N = x_enc.size()
 
-        # 1. Instance Normalization
+        # Instance Normalization
         # x_enc = self.revin(x_enc, 'norm')
 
         # 2. Independent Channel Embedding
