@@ -137,25 +137,27 @@ class HybridEncoderLayer(nn.Module):
         # x: [B, N, T, d_model]
         B, N, T, D = x.size()
 
-        # --- Branch A: Temporal ---
-        # Reshape to treat variates as batch for independent temporal processing
-        x_bn = x.reshape(B * N, T, D)
-        h_a = self.branch_a(x_bn)
-        h_a = h_a.reshape(B, N, T, D)
+        # --- Branch B: Cross-Variate (Applies to all channels) ---
+        h_b = self.branch_b(x)  # [B, N, T, d_model]
 
-        # --- Branch B: Cross-Variate ---
-        h_b = self.branch_b(x)
+        # --- Branch A: Temporal Prior (only targets the last channel) ---
+        x_target = x[:, -1:, :, :]  # Extract last channel: [B, 1, T, d_model]
+        x_bn = x_target.reshape(B, T, D)  # [B, T, d_model]
 
-        # --- Gated Fusion & Residual ---
-        # Sigmoid ensures the gate strictly remains between 0 and 1
+        h_a_target = self.branch_a(x_bn)  # [B, T, d_model]
+        h_a_target = h_a_target.unsqueeze(1)  # [B, 1, T, d_model]
+
+        # --- Gated Fusion for Target vs Direct Assignment for Exogenous ---
         g = torch.sigmoid(self.gate)
-        fused = g * h_a + (1 - g) * h_b
 
-        x = x + self.dropout(fused)
-        x = self.norm1(x)
+        # Combine representations
+        fused_output = h_b.clone()
+        # Apply the gated blend ONLY to the last channel
+        fused_output[:, -1:, :, :] = g * h_a_target + (1 - g) * h_b[:, -1:, :, :]
+
+        x = x + self.dropout(fused_output)
+        return self.norm1(x)
 
         # Optional FF Network (Standard Transformer blocks) could be added here
-        # For brevity and alignment with TimesNet/iTransformer hybrids, we omit it
-        # unless you specifically want the FFN expansion.
 
         return x
