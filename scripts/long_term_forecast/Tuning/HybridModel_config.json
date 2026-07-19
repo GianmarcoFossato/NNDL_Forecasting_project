@@ -1,0 +1,54 @@
+{
+  "min_resource": 1,
+  "reduction_factor": 2,
+  "min_early_stopping_rate": 0,
+  "n_trials": 20,
+  "parameters": {
+    "learning_rate": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [0.0001, 0.0005, 0.001]
+      }
+    },
+    "d_model": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [64, 128, 256]
+      }
+    },
+    "n_heads": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [4, 8]
+      }
+    },
+    "dropout": {
+      "type": "float",
+      "kwargs": {
+        "low": 0.05,
+        "high": 0.3,
+        "step": 0.05
+      }
+    },
+    "top_k": {
+      "type": "int",
+      "kwargs": {
+        "low": 2,
+        "high": 5,
+        "step": 1
+      }
+    }
+  },
+  "special_cases": {
+    "HybridModel": {
+      "parameters": {
+        "e_layers": {
+          "type": "categorical",
+          "kwargs": {
+            "choices": [1, 2]
+          }
+        }
+      }
+    }
+  }
+}
