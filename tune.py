@@ -11,7 +11,7 @@ import json
 import shutil
 
 def save_trials_callback(study, trial, args):
-    model_dir = f'test_results/{args.model_id}_{args.model}'
+    model_dir = f'test_results/hp_search_{args.model_id}_{args.model}'
     os.makedirs(model_dir, exist_ok=True)
 
     df = study.trials_dataframe()
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     last_trial_file = None
 
     # Persistent SQLite file for later visualization
-    study_folder = f"{args.model_id}_{args.model}"
+    study_folder = f"hp_search_{args.model_id}_{args.model}"
     db_dir = os.path.join('test_results', study_folder)
     os.makedirs(db_dir, exist_ok=True)
     logger.activate_file_logging(db_dir)
@@ -189,7 +189,7 @@ if __name__ == '__main__':
     for ii in range(args.itr):
         test_seed += 1
         set_seed(test_seed)
-        setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}_{}'.format(
+        setting = 'optimized_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}_{}'.format(
             args.task_name,
             args.model_id,
             args.model,
@@ -211,7 +211,7 @@ if __name__ == '__main__':
             args.des, ii, test_seed)
         exp.train(setting)
 
-        # Test the model
+        # Test the optimized model
         exp.test(setting)
 
     logger.deactivate_file_logging()
