@@ -18,4 +18,4 @@ python -u tune.py \
   --train_epochs 20 \
   --patience 5 \
   --num_workers 0 \
-  --path_to_hp_config scripts/long_term_forecast/Tuning/HybridModel_config.json
+  --path_to_hp_config scripts/long_term_forecast/Tuning/HyPT_config.json
