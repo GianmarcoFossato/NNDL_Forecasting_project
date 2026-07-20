@@ -83,7 +83,7 @@
         "d_period": {
           "type": "categorical",
           "kwargs": {
-            "choices": [16, 32, 64, 128]
+            "choices": [16, 32]
           }
         }
       }
