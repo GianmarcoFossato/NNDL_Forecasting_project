@@ -195,6 +195,10 @@ def init_parser():
     parser.add_argument('--pos', type=int, choices=[0, 1], default=1, help='Positional Embedding. Set pos to 0 or 1')
 
     # HyPT
+    parser.add_argument('--d_period', type=int, default=None,
+                        help='Branch A (periodicity) working dimension, decoupled from d_model. '
+                             'If None, defaults to max(d_model // 4, 8) inside the model. '
+                             'Suggested values: [16, 32, 64, 128].')
     parser.add_argument('--branch_dropout', type=float, default=0.1,
                         help='target branch drop probability for hybrid architecture')
     parser.add_argument('--branch_warmup_epochs', type=int, default=3,

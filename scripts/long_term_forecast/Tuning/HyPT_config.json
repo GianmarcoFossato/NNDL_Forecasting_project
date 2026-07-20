@@ -76,11 +76,24 @@
       "parameters": {
         "e_layers": {
           "type": "categorical",
-          "kwargs": {
-            "choices": [1, 2, 3]
-          }
+          "kwargs": { "choices": [1, 2, 3] }
+        },
+        "d_period": {
+          "type": "categorical",
+          "kwargs": { "choices": [16, 32, 64, 128] }
         }
       }
     }
-  }
+  },
+  "_notes": {
+  "d_model": "[128, 256, 512] — Branch B's self-attention and the FFN scale with this; it's the main capacity/cost knob.",
+  "d_period": "[16, 32, 64, 128] — keep well below d_model; this is what Branch A's O(d_model^2) conv cost is paid in.",
+  "top_k": "[3, 5] — ECL has daily+weekly cycles, so 3-5 is a reasonable range according to the original paper; 2 risks missing the weekly component.",
+  "n_heads": "{4, 8} — use 4 if d_model is on the small end (128) so each head keeps reasonable width.",
+  "branch_dropout": "[0.05, 0.25] — regularizes against over-relying on one branch; start at 0.1.",
+  "branch_warmup_epochs": "{2, 3, 5} — should scale with train_epochs so warmup doesn't eat the whole run.",
+  "dropout": "[0.05, 0.3] — ECL is fairly low-noise at daily/weekly scale; start around 0.1-0.15.",
+  "d_ff": "[256, 512, 1024] — roughly 2x d_model as a starting ratio.",
+  "learning_rate": "[0.0001, 0.001] — lower end (1e-4, 3e-4) is usually safer once N=321 channels are all being updated per step."
+}
 }

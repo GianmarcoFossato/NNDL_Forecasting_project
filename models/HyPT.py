@@ -30,8 +30,7 @@ class Model(nn.Module):
         # Pluggable 2D Conv block factory for Branch A.
         def conv_factory(in_channels, out_channels):
             return nn.Sequential(
-                ConvNeXtBlock2D(in_channels, out_channels),
-                nn.GELU()
+                ConvNeXtBlock2D(in_channels, out_channels)
             )
 
         self.layers = nn.ModuleList([
