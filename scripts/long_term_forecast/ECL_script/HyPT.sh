@@ -5,7 +5,7 @@ model_name="HyPT"
 
 # Architectural Hyperparameters
 D_MODEL=256
-D_PERIOD=64          # Decoupled Branch A dimension (1/4 of d_model)
+D_PERIOD=16          # Decoupled Branch A dimension (1/4 of d_model)
 D_FF=512
 N_HEADS=8
 E_LAYERS=2
