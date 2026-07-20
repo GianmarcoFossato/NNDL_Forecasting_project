@@ -6,6 +6,12 @@ WORKERS=0
 BRANCH_DROPOUT=0.1
 BRANCH_WARMUP_EPOCHS=3
 
+# Key Training Tweaks
+LEARNING_RATE=0.0005
+EPOCHS=20
+PATIENCE=5
+LR_ADJ="type3"        # gentler decay than type1
+
 ID_1="ECL_96_96"
 
 python -u run.py \
@@ -31,6 +37,10 @@ python -u run.py \
   --top_k 5 \
   --branch_dropout $BRANCH_DROPOUT \
   --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
+  --learning_rate $LEARNING_RATE \
+  --train_epochs $EPOCHS \
+  --patience $PATIENCE \
+  --lradj $LR_ADJ \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
@@ -62,6 +72,10 @@ python -u run.py \
   --top_k 5 \
   --branch_dropout $BRANCH_DROPOUT \
   --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
+  --learning_rate $LEARNING_RATE \
+  --train_epochs $EPOCHS \
+  --patience $PATIENCE \
+  --lradj $LR_ADJ \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
@@ -93,6 +107,10 @@ python -u run.py \
   --top_k 5 \
   --branch_dropout $BRANCH_DROPOUT \
   --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
+  --learning_rate $LEARNING_RATE \
+  --train_epochs $EPOCHS \
+  --patience $PATIENCE \
+  --lradj $LR_ADJ \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
@@ -124,6 +142,10 @@ python -u run.py \
   --top_k 3 \
   --branch_dropout $BRANCH_DROPOUT \
   --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
+  --learning_rate $LEARNING_RATE \
+  --train_epochs $EPOCHS \
+  --patience $PATIENCE \
+  --lradj $LR_ADJ \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \

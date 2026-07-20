@@ -54,7 +54,7 @@ def suggest_params(trial, args, hp_configs):
     #     args.dw_dims = torch.ones(args.e_layers, dtype=torch.int32).tolist() * args.d_model
 
     # Fix the feedforward dimension to be equal to d_model for the HP search
-    args.d_ff = args.d_model
+    # args.d_ff = args.d_model
     return args
 
 
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     for key, value in trial.params.items():
         setattr(args, key, value)
 
-    args.d_ff = args.d_model
+    # args.d_ff = args.d_model
     args.d_temp = args.d_model
     exp = Exp_Long_Term_Forecast(args)
 

@@ -7,13 +7,31 @@
     "learning_rate": {
       "type": "categorical",
       "kwargs": {
-        "choices": [0.0001, 0.0005, 0.001]
+        "choices": [0.0001, 0.0003, 0.0005, 0.001]
+      }
+    },
+    "batch_size": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [4, 16, 32, 64]
+      }
+    },
+    "train_epochs": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [10, 15, 20]
       }
     },
     "d_model": {
       "type": "categorical",
       "kwargs": {
-        "choices": [64, 128, 256]
+        "choices": [128, 256, 512]
+      }
+    },
+    "d_ff": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [256, 512, 1024]
       }
     },
     "n_heads": {
@@ -37,21 +55,8 @@
         "high": 5,
         "step": 1
       }
-    }
-  },
-  "special_cases": {
-    "HybridModel": {
-      "parameters": {
-        "e_layers": {
-          "type": "categorical",
-          "kwargs": {
-            "choices": [1, 2]
-          }
-        }
-      }
-    }
-  },
-  "branch_dropout": {
+    },
+    "branch_dropout": {
       "type": "float",
       "kwargs": {
         "low": 0.05,
@@ -62,13 +67,20 @@
     "branch_warmup_epochs": {
       "type": "categorical",
       "kwargs": {
-        "choices": [2, 3]
-      }
-    },
-    "d_model": {
-      "type": "categorical",
-      "kwargs": {
-        "choices": [64, 128, 256]
+        "choices": [2, 3, 5]
       }
     }
+  },
+  "special_cases": {
+    "HyPT": {
+      "parameters": {
+        "e_layers": {
+          "type": "categorical",
+          "kwargs": {
+            "choices": [1, 2, 3]
+          }
+        }
+      }
+    }
+  }
 }

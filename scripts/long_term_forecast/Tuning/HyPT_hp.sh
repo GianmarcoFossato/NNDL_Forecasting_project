@@ -15,6 +15,7 @@ python -u tune.py \
   --enc_in 321 \
   --dec_in 321 \
   --c_out 321 \
+  --train_epochs 20 \
+  --patience 5 \
   --num_workers 0 \
-  --train_epochs 10 \
   --path_to_hp_config scripts/long_term_forecast/Tuning/HybridModel_config.json
