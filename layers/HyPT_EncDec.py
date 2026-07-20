@@ -88,6 +88,7 @@ class ExogenousBranch(nn.Module):
 
     def __init__(self, configs):
         super().__init__()
+        self.seq_len = configs.seq_len
         self.d_model = configs.d_model
 
         # Linear projection maps individual variate temporal features (T * d_model) -> d_model token vector
@@ -159,12 +160,15 @@ class HybridEncoderLayer(nn.Module):
 
         self.norm1 = nn.LayerNorm(configs.d_model)
         self.norm2 = nn.LayerNorm(configs.d_model)
-
-        # Learnable gate for fusion; broadcasts automatically over the Variates (N) dimension
-        self.gate = nn.Parameter(torch.zeros(1, 1, 1, configs.d_model))
-
-        self.norm1 = nn.LayerNorm(configs.d_model)
         self.dropout = nn.Dropout(configs.dropout)
+
+        # Feed-Forward Network (FFN)
+        self.ffn = nn.Sequential(
+            nn.Linear(configs.d_model, configs.d_ff),
+            nn.GELU(),
+            nn.Dropout(configs.dropout),
+            nn.Linear(configs.d_ff, configs.d_model)
+        )
 
     def set_epoch(self, epoch: int):
         """Sets current training epoch to compute annealing schedules."""
