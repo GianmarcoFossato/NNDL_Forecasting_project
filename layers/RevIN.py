@@ -15,12 +15,12 @@ class RevIN(nn.Module):
         if self.affine:
             self._init_affine_params()
 
-    def forward(self, x, mode:str):
+    def forward(self, x, mode:str, target_idx=None):
         if mode == 'norm':
             self._get_statistics(x)
             x = self._normalize(x)
         elif mode == 'denorm':
-            x = self._denormalize(x)
+            x = self._denormalize(x, target_idx=target_idx)
         else:
             raise NotImplementedError
         return x
@@ -42,10 +42,23 @@ class RevIN(nn.Module):
             x = x + self.affine_bias
         return x
 
-    def _denormalize(self, x):
+    def _denormalize(self, x, target_idx=None):
+        if target_idx is not None:
+            if isinstance(target_idx, int):
+                target_idx = [target_idx]
+            mean = self.mean[..., target_idx]
+            stdev = self.stdev[..., target_idx]
+        else:
+            mean = self.mean
+            stdev = self.stdev
+
         if self.affine:
-            x = x - self.affine_bias
-            x = x / (self.affine_weight + self.eps*self.eps)
-        x = x * self.stdev
-        x = x + self.mean
+            weight = self.affine_weight if target_idx is None else self.affine_weight[target_idx]
+            bias = self.affine_bias if target_idx is None else self.affine_bias[target_idx]
+
+            x = x - bias
+            x = x / (weight + self.eps)
+
+        x = x * stdev
+        x = x + mean
         return x

@@ -120,7 +120,6 @@ def init_parser():
                         help='down sampling method, only support avg, max, conv')
     parser.add_argument('--seg_len', type=int, default=96,
                         help='the length of segmen-wise iteration of SegRNN')
-    parser.add_argument('--revin', action='store_true', help='whether to apply RevIN', default=True)
 
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
@@ -195,6 +194,12 @@ def init_parser():
     parser.add_argument('--top_p', type=float, default=0.5, help='Dynamic Routing in MoE')
     parser.add_argument('--pos', type=int, choices=[0, 1], default=1, help='Positional Embedding. Set pos to 0 or 1')
 
+    # HyPT
+    parser.add_argument('--branch_dropout', type=float, default=0.1,
+                        help='target branch drop probability for hybrid architecture')
+    parser.add_argument('--branch_warmup_epochs', type=int, default=3,
+                        help='warmup epochs for linear branch drop rate annealing')
+
     # Tune configs file
     parser.add_argument('--path_to_hp_config', type=str, default=None, help='Path to hyperparameter config file (json)')
 
@@ -257,8 +262,6 @@ if __name__ == '__main__':
                 args.distil,
                 args.des, ii)
 
-            if args.revin:
-                setting += '_revin'
 
             if args.no_compile:
                 setting += '_no_compile'
@@ -312,8 +315,6 @@ if __name__ == '__main__':
             args.distil,
             args.des, ii)
 
-        if args.revin:
-            setting += '_revin'
 
         # Override setting for specific model to ensure proper checkpoint naming and logging
         if args.model == 'MambaSingleLayer' and args.task_name == 'classification':

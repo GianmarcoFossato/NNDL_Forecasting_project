@@ -106,6 +106,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         test_loss_history = []
 
         for epoch in range(self.args.train_epochs):
+            # Recursively update current_epoch across all submodules that implement set_epoch
+            for module in self.model.modules():
+                if hasattr(module, 'set_epoch') and callable(module.set_epoch):
+                    module.set_epoch(epoch)
+
             iter_count = 0
             train_loss = []
 

@@ -1,8 +1,10 @@
 export CUDA_VISIBLE_DEVICES=0
 
-model_name="HybridModel"
-BATCH_SIZE=32
+model_name="HyPT"
+BATCH_SIZE=4
 WORKERS=0
+BRANCH_DROPOUT=0.1
+BRANCH_WARMUP_EPOCHS=3
 
 ID_1="ECL_96_96"
 
@@ -27,10 +29,13 @@ python -u run.py \
   --d_model 256 \
   --d_ff 512 \
   --top_k 5 \
+  --branch_dropout $BRANCH_DROPOUT \
+  --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS \
+  --no_compile
 
 ID_2="ECL_96_192"
 
@@ -55,10 +60,13 @@ python -u run.py \
   --d_model 256 \
   --d_ff 512 \
   --top_k 5 \
+  --branch_dropout $BRANCH_DROPOUT \
+  --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS \
+  --no_compile
 
 ID_3="ECL_96_336"
 
@@ -83,10 +91,13 @@ python -u run.py \
   --d_model 256 \
   --d_ff 512 \
   --top_k 5 \
+  --branch_dropout $BRANCH_DROPOUT \
+  --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS \
+  --no_compile
 
 ID_4="ECL_96_720"
 
@@ -111,9 +122,12 @@ python -u run.py \
   --d_model 256 \
   --d_ff 512 \
   --top_k 3 \
+  --branch_dropout $BRANCH_DROPOUT \
+  --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
   --des 'Exp' \
   --itr 1 \
   --batch_size $BATCH_SIZE \
-  --num_workers $WORKERS
+  --num_workers $WORKERS \
+  --no_compile
 
-echo "Verification suite for ${model_name} completed successfully."
+echo "All ${model_name} training jobs completed."

@@ -50,5 +50,25 @@
         }
       }
     }
-  }
+  },
+  "branch_dropout": {
+      "type": "float",
+      "kwargs": {
+        "low": 0.05,
+        "high": 0.25,
+        "step": 0.05
+      }
+    },
+    "branch_warmup_epochs": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [2, 3]
+      }
+    },
+    "d_model": {
+      "type": "categorical",
+      "kwargs": {
+        "choices": [64, 128, 256]
+      }
+    }
 }

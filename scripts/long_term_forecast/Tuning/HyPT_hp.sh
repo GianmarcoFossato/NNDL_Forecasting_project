@@ -6,7 +6,7 @@ python -u tune.py \
   --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
   --model_id ECL_96_96 \
-  --model HybridModel \
+  --model HyPT \
   --data custom \
   --features M \
   --seq_len 96 \
@@ -16,5 +16,5 @@ python -u tune.py \
   --dec_in 321 \
   --c_out 321 \
   --num_workers 0 \
-  --train_epochs 5 \
+  --train_epochs 10 \
   --path_to_hp_config scripts/long_term_forecast/Tuning/HybridModel_config.json

@@ -36,6 +36,10 @@ def print_args(args):
     print(f'  {"d layers:":<20}{args.d_layers:<20}{"d FF:":<20}{args.d_ff:<20}')
     print(f'  {"Moving Avg:":<20}{args.moving_avg:<20}{"Factor:":<20}{args.factor:<20}')
     print(f'  {"Distil:":<20}{args.distil:<20}{"Dropout:":<20}{args.dropout:<20}')
+    if args.model in ['HyPT', 'HybridModel']:
+        branch_drop = getattr(args, 'branch_dropout', 0.1)
+        warmup_ep = getattr(args, 'branch_warmup_epochs', 3)
+        print(f'  {"Branch Dropout:":<20}{branch_drop:<20}{"Warmup Epochs:":<20}{warmup_ep:<20}')
     print(f'  {"Embed:":<20}{args.embed:<20}{"Activation:":<20}{args.activation:<20}')
     print()
 
