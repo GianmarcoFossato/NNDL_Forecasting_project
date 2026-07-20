@@ -108,49 +108,44 @@ class ExogenousBranch(nn.Module):
         # Map attention-refined variate tokens back to the full sequence feature space (T * d_model)
         self.variate_projection = nn.Linear(configs.d_model, configs.seq_len * configs.d_model)
 
-    def forward(self, x):
-        # x shape: [Batch, Variates (N), Time (T), d_model (D)]
-        B, N, T, D = x.size()
+    def forward(self, x_exo, x_endo):
+        # x_exo:  [Batch, N-1, Time, d_model]
+        # x_endo: [Batch, 1, Time, d_model]
+        B, N_exo, T, D = x_exo.size()
 
-        if T != self.seq_len:
-            raise ValueError(f"ExogenousBranch expected time sequence dimension {self.seq_len}, received {T}.")
+        # Map temporal sequences to token vectors [B, Variates, d_model]
+        exo_flat = x_exo.reshape(B, N_exo, T * D)
+        endo_flat = x_endo.reshape(B, 1, T * D)
 
-        # Collapse temporal features: [B, N, T * D]
-        x_flat = x.reshape(B, N, T * D)
+        exo_tokens = self.variate_embedding(exo_flat)  # [B, N-1, d_model]
+        endo_token = self.variate_embedding(endo_flat)  # [B, 1, d_model]
 
-        # Project each variate to d_model token embedding -> [B, N, d_model]
-        variate_tokens = self.variate_embedding(x_flat)
-
-        # Apply Multi-Head Self-Attention across the channel/variate dimension (N)
-        # In iTransformer, Query, Key, and Value are all the set of variate tokens
+        # Target (Query) attends to Exogenous variables (Key/Value)
         attn_out, _ = self.cross_attention(
-            variate_tokens,
-            variate_tokens,
-            variate_tokens,
+            endo_token,  # Query
+            exo_tokens,  # Key
+            exo_tokens,  # Value
             attn_mask=None
-        )  # Output shape: [B, N, d_model]
+        )  # Output shape: [B, 1, d_model]
 
-        # Project back to full temporal feature shape [B, N, T * D]
+        # Project back to full sequence shape [B, 1, T, D]
         out_flat = self.variate_projection(attn_out)
+        out_endo = out_flat.reshape(B, 1, T, D)
 
-        # Reshape back to original tensor layout [B, N, T, D]
-        out = out_flat.reshape(B, N, T, D)
-
-        return out
+        return out_endo
 
 
 class HybridEncoderLayer(nn.Module):
     """
-    Fuses isolated Target Periodicity (Branch A) and Multi-Variate Attention (Branch B).
-    Processes all N channels for the M (Multivariate-to-Multivariate) forecasting objective.
+    Combines Target Periodicity (Branch A) and Exogenous Context (Branch B)
+    using a learnable convex gate and annealing schedule for the Target channel.
     """
-
     def __init__(self, configs, conv_builder):
         super().__init__()
         self.branch_a = PluggablePeriodBlock(configs, conv_builder)
         self.branch_b = ExogenousBranch(configs)
 
-        # Gate parameter
+        # Gate parameter for fusing target representations
         self.gate = nn.Parameter(torch.zeros(1, 1, 1, configs.d_model))
 
         # Branch drop hyperparameters
@@ -162,7 +157,6 @@ class HybridEncoderLayer(nn.Module):
         self.norm2 = nn.LayerNorm(configs.d_model)
         self.dropout = nn.Dropout(configs.dropout)
 
-        # Feed-Forward Network (FFN)
         self.ffn = nn.Sequential(
             nn.Linear(configs.d_model, configs.d_ff),
             nn.GELU(),
@@ -178,46 +172,47 @@ class HybridEncoderLayer(nn.Module):
         """Computes linearly annealed branch drop probability based on current epoch."""
         if not self.training or self.warmup_epochs <= 0:
             return self.target_branch_dropout
-
         if self.current_epoch < self.warmup_epochs:
             return self.target_branch_dropout * (self.current_epoch / self.warmup_epochs)
         return self.target_branch_dropout
 
     def forward(self, x):
-        # x shape: [Batch, Variates, Time, d_model]
+        # x shape: [Batch, Variates (N), Time (T), d_model (D)]
         B, N, T, D = x.size()
 
-        # Branch B: iTransformer Cross-Variate Attention across all channels
-        h_b = self.branch_b(x)
+        x_exo = x[:, :-1, :, :]   # Exogenous variables [B, N-1, T, D]
+        x_endo = x[:, -1:, :, :]  # Endogenous target [B, 1, T, D]
 
-        # Branch A: Process temporal periodicity independently for all channels
-        x_flat = x.reshape(B * N, T, D)
-        h_a_flat = self.branch_a(x_flat)
-        h_a = h_a_flat.reshape(B, N, T, D)
+        # Branch A: Process period structure on target channel only (Fast B*1 processing)
+        h_a_flat = self.branch_a(x_endo.reshape(B, T, D))
+        h_a = h_a_flat.reshape(B, 1, T, D)
 
-        # Determine drop behavior based on current schedule
+        # Branch B: Target attends to Exogenous channels
+        if N > 1:
+            h_b_target = self.branch_b(x_exo, x_endo)
+        else:
+            h_b_target = torch.zeros_like(h_a)
+
+        # Apply Gating & Branch Dropout Schedule on the Target Channel
         current_p = self._get_current_drop_rate()
-
         if self.training and current_p > 0.0:
             rand_val = torch.rand(1, device=x.device).item()
             if rand_val < current_p / 2:
-                # Direct route Branch A
-                fused = h_a
+                fused_target = h_a
             elif rand_val < current_p:
-                # Direct route Branch B
-                fused = h_b
+                fused_target = h_b_target
             else:
-                # Convex gated fusion
                 g = torch.sigmoid(self.gate)
-                fused = g * h_a + (1 - g) * h_b
+                fused_target = g * h_a + (1 - g) * h_b_target
         else:
             g = torch.sigmoid(self.gate)
-            fused = g * h_a + (1 - g) * h_b
+            fused_target = g * h_a + (1 - g) * h_b_target
 
-        # First residual block: Fusion normalization
+        # Re-assemble exogenous channels and the fused target channel
+        fused = torch.cat([x_exo, fused_target], dim=1) if N > 1 else fused_target
+
+        # Residual connections + FFN
         x = self.norm1(x + self.dropout(fused))
-
-        # Second residual block: Non-linear feature transformation via FFN
         out = self.norm2(x + self.dropout(self.ffn(x)))
 
         return out
