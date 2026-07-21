@@ -33,7 +33,6 @@ class Model(nn.Module):
         L_in = self.seq_len + self.padding
         self.num_patches = (L_in - self.patch_len) // self.stride + 1
 
-        # 3. Replace DataEmbedding with your PatchEmbedding
         self.patch_embedding = PatchEmbedding(
             d_model=configs.d_model,
             patch_len=self.patch_len,

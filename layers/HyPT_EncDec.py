@@ -37,11 +37,9 @@ class PluggablePeriodBlock(nn.Module):
         self.down_proj = nn.Linear(configs.d_model, self.d_period)
         self.up_proj = nn.Linear(self.d_period, configs.d_model)
 
-        self.N = configs.enc_in  # Number of variates
-
         # All channels are processed together in the channel dimension
         self.conv_blocks = nn.ModuleList([
-            conv_builder(self.d_period * self.N, self.d_period * self.N, groups=self.N) for _ in range(self.k)
+            conv_builder(self.d_period, self.d_period) for _ in range(self.k)
         ])
     def forward(self, x):
         # x shape: [Batch * Variates, Time, d_model]
