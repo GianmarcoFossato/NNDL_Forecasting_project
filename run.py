@@ -203,6 +203,13 @@ def init_parser():
                         help='target branch drop probability for hybrid architecture')
     parser.add_argument('--branch_warmup_epochs', type=int, default=3,
                         help='warmup epochs for linear branch drop rate annealing')
+    parser.add_argument(
+        '--ablation_mode',
+        type=str,
+        default='both',
+        choices=['both', 'branch_a', 'branch_b'],
+        help='Ablation mode: both (full hybrid), branch_a (periodicity only), or branch_b (cross-variate only)',
+    )
 
     # Tune configs file
     parser.add_argument('--path_to_hp_config', type=str, default=None, help='Path to hyperparameter config file (json)')

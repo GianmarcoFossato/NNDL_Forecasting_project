@@ -144,12 +144,20 @@ class CrossVariateBranch(nn.Module):
 class HybridEncoderLayer(nn.Module):
     def __init__(self, configs, conv_builder):
         super().__init__()
-        self.branch_a = PrototypePeriodBlock(configs, conv_builder)
-        self.branch_b = CrossVariateBranch(configs)
+        self.ablation_mode = getattr(configs, 'ablation_mode', 'both')
 
-        self.gate = nn.Parameter(torch.zeros(1, 1, 1, configs.d_model))
-        self.target_branch_dropout = getattr(configs, 'branch_dropout', 0.1)
-        self.warmup_epochs = getattr(configs, 'branch_warmup_epochs', 3)
+        # Instantiation based on mode
+        if self.ablation_mode in ['both', 'branch_a']:
+            self.branch_a = PrototypePeriodBlock(configs, conv_builder)
+
+        if self.ablation_mode in ['both', 'branch_b']:
+            self.branch_b = CrossVariateBranch(configs)
+
+        if self.ablation_mode == 'both':
+            self.gate = nn.Parameter(torch.zeros(1, 1, 1, configs.d_model))
+            self.target_branch_dropout = getattr(configs, 'branch_dropout', 0.1)
+            self.warmup_epochs = getattr(configs, 'branch_warmup_epochs', 3)
+
         self.current_epoch = 0
 
         self.norm1 = nn.LayerNorm(configs.d_model)
@@ -160,7 +168,7 @@ class HybridEncoderLayer(nn.Module):
             nn.Linear(configs.d_model, configs.d_ff),
             nn.GELU(),
             nn.Dropout(configs.dropout),
-            nn.Linear(configs.d_ff, configs.d_model)
+            nn.Linear(configs.d_ff, configs.d_model),
         )
 
     def set_epoch(self, epoch: int):
@@ -170,34 +178,43 @@ class HybridEncoderLayer(nn.Module):
         if not self.training or self.warmup_epochs <= 0:
             return self.target_branch_dropout
         if self.current_epoch < self.warmup_epochs:
-            return self.target_branch_dropout * (self.current_epoch / self.warmup_epochs)
+            return self.target_branch_dropout * (
+                    self.current_epoch / self.warmup_epochs
+            )
         return self.target_branch_dropout
 
     def forward(self, x):
-        # x shape: [B, N, P, D]
-        B, N, P, D = x.size()
+        # Branch Routing
+        if self.ablation_mode == 'branch_a':
+            fused = self.branch_a(x)
 
-        # Branch A: Periodicity over time patches
-        h_a = self.branch_a(x)
+        elif self.ablation_mode == 'branch_b':
+            fused = self.branch_b(x)
 
-        # Branch B: Cross-variate mixing across channels
-        h_b = self.branch_b(x)
+        else:  # 'both'
+            B, N, P, D = x.size()  # x shape: [B, N, P, D]
+            h_a = self.branch_a(x) # Branch A: Periodicity over time patches
+            h_b = self.branch_b(x) # Branch B: Cross-variate mixing across channels
 
-        # Dynamic Per-Sample Branch Dropout (Vectorized across batch dimension)
-        current_p = self._get_current_drop_rate()
-        if self.training and current_p > 0.0:
-            rand_val = torch.rand(B, 1, 1, 1, device=x.device)
-            g = torch.sigmoid(self.gate)
-            fused_gate = g * h_a + (1 - g) * h_b
+            # Dynamic Per-Sample Branch Dropout (Vectorized across batch dimension)
+            current_p = self._get_current_drop_rate()
+            if self.training and current_p > 0.0:
+                rand_val = torch.rand(B, 1, 1, 1, device=x.device)
+                g = torch.sigmoid(self.gate)
+                fused_gate = g * h_a + (1 - g) * h_b
 
-            a_only_mask = (rand_val < current_p / 2).float()
-            b_only_mask = ((rand_val >= current_p / 2) & (rand_val < current_p)).float()
-            default_mask = 1.0 - a_only_mask - b_only_mask
+                a_only_mask = (rand_val < current_p / 2).float()
+                b_only_mask = (
+                        (rand_val >= current_p / 2) & (rand_val < current_p)
+                ).float()
+                default_mask = 1.0 - a_only_mask - b_only_mask
 
-            fused = a_only_mask * h_a + b_only_mask * h_b + default_mask * fused_gate
-        else:
-            g = torch.sigmoid(self.gate)
-            fused = g * h_a + (1 - g) * h_b
+                fused = (
+                        a_only_mask * h_a + b_only_mask * h_b + default_mask * fused_gate
+                )
+            else:
+                g = torch.sigmoid(self.gate)
+                fused = g * h_a + (1 - g) * h_b
 
         x = self.norm1(x + self.dropout(fused))
         out = self.norm2(x + self.dropout(self.ffn(x)))
