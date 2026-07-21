@@ -60,9 +60,9 @@ COMMON_ARGS="--task_name long_term_forecast \
 
 # --- Horizon Runs ---
 
-python -u run.py --model_id ECL_96_96 --pred_len 96 $COMMON_ARGS
-python -u run.py --model_id ECL_96_192 --pred_len 192 $COMMON_ARGS
-python -u run.py --model_id ECL_96_336 --pred_len 336 $COMMON_ARGS
+#python -u run.py --model_id ECL_96_96 --pred_len 96 $COMMON_ARGS
+#python -u run.py --model_id ECL_96_192 --pred_len 192 $COMMON_ARGS
+#python -u run.py --model_id ECL_96_336 --pred_len 336 $COMMON_ARGS
 python -u run.py --model_id ECL_96_720 --pred_len 720 $COMMON_ARGS
 
 echo "All ${model_name} training jobs completed."
