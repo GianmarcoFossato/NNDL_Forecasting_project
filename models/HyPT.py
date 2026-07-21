@@ -1,17 +1,16 @@
 import torch
 import torch.nn as nn
-from layers.Embed import DataEmbedding
 from layers.Embed import PatchEmbedding
 from layers.HyPT_EncDec import HybridEncoderLayer
 from layers.ConvNeXtBlock2D import ConvNeXtBlock2D
 from layers.RevIN import RevIN
 
+
 class Model(nn.Module):
     """
-    Hybrid Period-Transformer (HyPT)
-    Period-Aware Cross-Variate Model.
-    Designed specifically to handle the ECL dataset constraints by retaining
-    a strong periodicity prior while explicitly mixing channel information.
+    Hybrid Period-Transformer (HyPT) - Optimized
+    Period-Aware Cross-Variate Model with Prototype Period Factorization
+    and Linear Trend Residual.
     """
 
     def __init__(self, configs):
@@ -21,15 +20,13 @@ class Model(nn.Module):
         self.pred_len = configs.pred_len
         self.num_variates = configs.enc_in
 
-        self.revin = RevIN(self.num_variates) #applied at the start of the whole model
+        self.revin = RevIN(self.num_variates)
 
         # Setup Patching Parameters
         self.patch_len = configs.patch_len
-        self.stride = self.patch_len // 2  # 50% overlap is standard
+        self.stride = self.patch_len // 2
         self.padding = self.stride
 
-        # Calculate the new temporal dimension (number of patches)
-        # Formula for unfold: (L_in - patch_len) // stride + 1
         L_in = self.seq_len + self.padding
         self.num_patches = (L_in - self.patch_len) // self.stride + 1
 
@@ -41,7 +38,6 @@ class Model(nn.Module):
             dropout=configs.dropout
         )
 
-        # Pluggable 2D Conv block factory for Branch A.
         def conv_factory(in_channels, out_channels):
             return nn.Sequential(
                 ConvNeXtBlock2D(in_channels, out_channels)
@@ -52,47 +48,44 @@ class Model(nn.Module):
             for _ in range(configs.e_layers)
         ])
 
-        # Channel-independent linear head
+        # Head Dropout for Projection Regularization
+        self.head_dropout = nn.Dropout(configs.dropout)
         self.projection = nn.Linear(self.num_patches * configs.d_model, self.pred_len)
+
+        # Parallel Channel-Independent Trend Residual Path
+        self.trend_proj = nn.Linear(self.seq_len, self.pred_len)
 
     def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         # x_enc: [B, T, N]
         B, T, N = x_enc.size()
 
-        # Instance Normalization
+        # 1. Instance Normalization
         x_enc = self.revin(x_enc, 'norm')
 
-        # Patch Embedding (Channel Independent)
-        # Transpose to [B, N, T] for your PatchEmbedding class
-        x_enc_patched = x_enc.transpose(1, 2)
+        # 2. Compute Linear Trend Baseline Path
+        trend_out = self.trend_proj(x_enc.transpose(1, 2))  # [B, N, pred_len]
 
-        # enc_out shape: [B*N, num_patches, d_model]
+        # 3. Patching & Hybrid Encoder Path
+        x_enc_patched = x_enc.transpose(1, 2)  # [B, N, T]
         enc_out, n_vars = self.patch_embedding(x_enc_patched)
 
-        # Reshape for the Hybrid Layers: [B, N, num_patches, d_model]
+        # Reshape to [B, N, num_patches, d_model]
         enc_out = enc_out.reshape(B, n_vars, self.num_patches, self.configs.d_model)
 
-        # Apply L Hybrid Layers
         for layer in self.layers:
             enc_out = layer(enc_out)
 
-        # Projection
-        # Flatten Time (now num_patches) and d_model: [B, N, num_patches * d_model]
+        # Flatten & Project with Head Dropout
         enc_out = enc_out.reshape(B, N, self.num_patches * self.configs.d_model)
+        dec_out = self.projection(self.head_dropout(enc_out))  # [B, N, pred_len]
 
-        # Project to prediction length: [B, N, pred_len]
-        dec_out = self.projection(enc_out)
+        # Add Trend Component
+        dec_out = dec_out + trend_out
 
-        # Reshape back to standard library format: [B, pred_len, N]
+        # Reshape to library expectation: [B, pred_len, N]
         dec_out = dec_out.transpose(1, 2)
 
         # Denormalize
         dec_out = self.revin(dec_out, 'denorm')
-
-        # In case of MS, pass target index
-        # if dec_out.shape[-1] != self.num_variates:
-        #     dec_out = self.revin(dec_out, 'denorm', target_idx=-1)
-        # else:
-        #     dec_out = self.revin(dec_out, 'denorm')
 
         return dec_out
