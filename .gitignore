@@ -166,3 +166,15 @@ result_anomaly_detection.txt
 scripts/augmentation/
 run_anylearn.py
 environment.txt
+
+# Allow tracking .log and .txt files inside paper_test_results
+!/paper_test_results/*.log
+!/paper_test_results/*.txt
+!/paper_test_results/**/*.log
+!/paper_test_results/**/*.txt
+
+# Allow tracking .log and .txt files inside test_results
+!/test_results/*.log
+!/test_results/*.txt
+!/test_results/**/*.log
+!/test_results/**/*.txt
