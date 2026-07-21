@@ -52,7 +52,7 @@
       "type": "int",
       "kwargs": {
         "low": 2,
-        "high": 5,
+        "high": 3,
         "step": 1
       }
     },

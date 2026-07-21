@@ -29,30 +29,20 @@ class PluggablePeriodBlock(nn.Module):
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
 
-        # top_k: number of dominant periods to model.
-        # Suggested range: [2, 5] (matches HyPT_config.json). ECL has strong
-        # daily + weekly cycles, so k=3-5 is a reasonable default; k=2 risks
-        # missing the weekly component, k>5 mostly adds compute for
-        # diminishing returns once the top 2-3 frequencies are captured.
         self.k = configs.top_k
 
         # d_period: Branch A's internal working width, decoupled from d_model.
-        # Suggested range: [16, 32, 64, 128]. Rule of thumb: d_model // 4 to
-        # d_model // 8. Start at 32-64; only go bigger if periodicity
-        # modeling is clearly the bottleneck in your ablations (step 1 of the
-        # ablation plan -- Branch A alone should roughly match TimesNet's
-        # published ECL numbers, which used a much smaller d_model than your
-        # main model does).
         self.d_period = configs.d_period if getattr(configs, 'd_period', None) else max(configs.d_model // 4, 8)
 
         self.down_proj = nn.Linear(configs.d_model, self.d_period)
         self.up_proj = nn.Linear(self.d_period, configs.d_model)
 
-        # k distinct 2D conv blocks, one per period, operating in d_period space.
-        self.conv_blocks = nn.ModuleList([
-            conv_builder(self.d_period, self.d_period) for _ in range(self.k)
-        ])
+        self.N = configs.enc_in  # Number of variates
 
+        # All channels are processed together in the channel dimension
+        self.conv_blocks = nn.ModuleList([
+            conv_builder(self.d_period * self.N, self.d_period * self.N, groups=self.N) for _ in range(self.k)
+        ])
     def forward(self, x):
         # x shape: [Batch * Variates, Time, d_model]
         x = self.down_proj(x)  # [B*N, T, d_period]
@@ -65,20 +55,10 @@ class PluggablePeriodBlock(nn.Module):
         amplitude = torch.mean(torch.abs(xf), dim=1)  # [B*N, T//2 + 1]
         amplitude[:, 0] = 0  # ignore DC component
 
-        # Average across Batch*Variates ONLY to choose *which* frequencies are
-        # globally dominant. This mirrors TimesNet: which periods to use is
-        # shared across the batch (you can't reshape different samples into
-        # different 2D grids in one batched conv call), but see below --
-        # WEIGHTING each chosen period is still per-sample.
+
         mean_amplitude = amplitude.mean(dim=0)
         _, top_list = torch.topk(mean_amplitude, self.k)
 
-        # BUG FIX (was previously reusing the batch-averaged amplitude as the
-        # weight for every sample, which threw away all per-sample
-        # adaptivity). Re-index the ORIGINAL per-sample amplitude at the
-        # chosen frequencies and softmax per-sample, so a window that's more
-        # daily-cycle-dominated gets a different period mix than one that's
-        # more weekly-cycle-dominated.
         per_sample_amplitude = amplitude[:, top_list]  # [B*N, k]
         period_weights = torch.softmax(per_sample_amplitude, dim=-1)  # [B*N, k]
 
@@ -96,10 +76,19 @@ class PluggablePeriodBlock(nn.Module):
             else:
                 x_padded = x
 
-            x_2d = x_padded.reshape(B, length // period, period, d_period).permute(0, 3, 2, 1).contiguous()
-            out_2d = self.conv_blocks[i](x_2d)
-            out_2d = out_2d.permute(0, 3, 2, 1).contiguous()
-            out_1d = out_2d.reshape(B, length, d_period)
+                # Reshape to separate B and N: [B, N, padded_length, d_period]
+                x_2d = x_padded.view(B // self.N, self.N, length, d_period)
+
+                # Reshape for 2D Conv: [B, N * d_period, H, W]
+                x_2d = x_2d.view(B // self.N, self.N * d_period, length // period, period)
+
+                # Apply Grouped Conv
+                out_2d = self.conv_blocks[i](x_2d)
+
+                # Return to [B*N, length, d_period]
+                out_2d = out_2d.view(B // self.N, self.N, d_period, length // period, period)
+                out_2d = out_2d.permute(0, 1, 3, 4, 2).contiguous()  # [B, N, H, W, d_period]
+                out_1d = out_2d.view(B, length, d_period)  # Back to flat B*N
 
             w = period_weights[:, i].view(B, 1, 1)  # per-sample scalar weight, not a global constant
             res = res + (out_1d[:, :T, :] * w)
@@ -110,26 +99,7 @@ class PluggablePeriodBlock(nn.Module):
 class CrossVariateBranch(nn.Module):
     """
     Branch B: symmetric cross-variate mixing (iTransformer-style), applied to
-    ALL N channels -- every channel is both a query and a key/value, unlike
-    the previous version where only one target channel attended to the rest.
-
-    Design note: a literal port of iTransformer's variate embedding would
-    flatten each channel's [T, d_model] into one T*d_model -> d_model Linear.
-    That was affordable when only 1 target token needed it; now that every
-    one of the N channels needs a token AND a way to get context back, doing
-    that flatten in both directions costs O(N * T * d_model^2), which is the
-    single most expensive thing in the model at N=321. Instead:
-      1. mean-pool over T for a cheap per-variate summary token: O(N*T*d_model)
-      2. ordinary self-attention across the N variate tokens: O(N^2 * d_model),
-         same cost iTransformer itself pays on ECL
-      3. broadcast the refined token back across T as additive context,
-         instead of re-projecting D -> T*d_model (which would reintroduce the
-         cost this whole redesign exists to avoid)
-    Branch A already owns fine-grained temporal modeling, so a pooled token
-    for Branch B is a deliberate simplification, not an oversight -- if
-    ablations show it's underpowered, the first thing to try is swapping the
-    mean-pool for attention-pooling (a single learnable query attending over
-    T) before reaching for the full flatten again.
+    ALL N channels -- every channel is both a query and a key/value.
     """
 
     def __init__(self, configs):
@@ -141,24 +111,18 @@ class CrossVariateBranch(nn.Module):
         self.cross_attention = AttentionLayer(
             FullAttention(
                 mask_flag=False,
-                # factor: attention scaling factor inherited from the library's
-                # FullAttention. Not worth tuning for full (non-sparse)
-                # attention -- leave at the run.py default (1).
+                # Attention scaling factor inherited from the library's FullAttention.
                 factor=configs.factor,
                 attention_dropout=configs.dropout,
                 output_attention=False
             ),
             configs.d_model,
-            # n_heads: suggested {4, 8} (matches HyPT_config.json). With
-            # d_model in the 128-512 range, 8 heads is a safe default;
-            # drop to 4 if d_model is on the small end (e.g. 128) so each
-            # head still gets a reasonable width.
             configs.n_heads
         )
 
         # Gate controlling how much cross-variate context gets added back
         # into each timestep. Initialized small so training starts close to
-        # "mostly ignore cross-variate context" and ramps it up as useful.
+        # mostly ignore cross-variate context and ramps it up as useful.
         self.context_gate = nn.Linear(configs.d_model, configs.d_model)
         nn.init.zeros_(self.context_gate.bias)
         nn.init.normal_(self.context_gate.weight, std=0.02)
@@ -181,10 +145,7 @@ class HybridEncoderLayer(nn.Module):
     """
     Combines Branch A (period-aware temporal prior) and Branch B (cross-variate
     context) with a learnable convex gate and a branch-dropout annealing
-    schedule. Applied symmetrically to ALL N channels -- the previous
-    endo/exo split is gone, since it meant only 1 of 321 channels ever got
-    refined by either branch, which isn't a fair --features M comparison
-    against iTransformer/TimeXer/TimesNet.
+    schedule. Applied symmetrically to ALL N channels.
     """
     def __init__(self, configs, conv_builder):
         super().__init__()
@@ -193,28 +154,16 @@ class HybridEncoderLayer(nn.Module):
 
         self.gate = nn.Parameter(torch.zeros(1, 1, 1, configs.d_model))
 
-        # branch_dropout: suggested range [0.05, 0.25], step 0.05 (matches
-        # HyPT_config.json). Higher = more aggressive regularization against
-        # over-relying on a single branch. Start at 0.1.
         self.target_branch_dropout = getattr(configs, 'branch_dropout', 0.1)
 
-        # branch_warmup_epochs: suggested {2, 3, 5} (matches HyPT_config.json).
-        # Should scale with train_epochs -- use 2-3 for a 10-epoch run, up to
-        # 5 for a 20-epoch run, so the warmup doesn't eat the whole schedule.
         self.warmup_epochs = getattr(configs, 'branch_warmup_epochs', 3)
         self.current_epoch = 0
 
         self.norm1 = nn.LayerNorm(configs.d_model)
         self.norm2 = nn.LayerNorm(configs.d_model)
-        # dropout: suggested range [0.05, 0.3], step 0.05 (matches
-        # HyPT_config.json). ECL is fairly low-noise at the daily/weekly
-        # scale; 0.1-0.15 is a reasonable starting point, push higher only if
-        # you see overfitting in the loss curves.
         self.dropout = nn.Dropout(configs.dropout)
 
         self.ffn = nn.Sequential(
-            # d_ff: suggested {256, 512, 1024} (matches HyPT_config.json).
-            # Keep roughly 2x d_model as a starting ratio.
             nn.Linear(configs.d_model, configs.d_ff),
             nn.GELU(),
             nn.Dropout(configs.dropout),

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from layers.Embed import DataEmbedding
+from layers.Embed import PatchEmbedding
 from layers.HyPT_EncDec import HybridEncoderLayer
 from layers.ConvNeXtBlock2D import ConvNeXtBlock2D
 from layers.RevIN import RevIN
@@ -22,9 +23,23 @@ class Model(nn.Module):
 
         self.revin = RevIN(self.num_variates) #applied at the start of the whole model
 
+        # Setup Patching Parameters
+        self.patch_len = configs.patch_len
+        self.stride = self.patch_len // 2  # 50% overlap is standard
+        self.padding = self.stride
 
-        self.enc_embedding = DataEmbedding(
-            1, configs.d_model, configs.embed, configs.freq, configs.dropout
+        # Calculate the new temporal dimension (number of patches)
+        # Formula for unfold: (L_in - patch_len) // stride + 1
+        L_in = self.seq_len + self.padding
+        self.num_patches = (L_in - self.patch_len) // self.stride + 1
+
+        # 3. Replace DataEmbedding with your PatchEmbedding
+        self.patch_embedding = PatchEmbedding(
+            d_model=configs.d_model,
+            patch_len=self.patch_len,
+            stride=self.stride,
+            padding=self.padding,
+            dropout=configs.dropout
         )
 
         # Pluggable 2D Conv block factory for Branch A.
@@ -39,7 +54,7 @@ class Model(nn.Module):
         ])
 
         # Channel-independent linear head
-        self.projection = nn.Linear(self.seq_len * configs.d_model, self.pred_len)
+        self.projection = nn.Linear(self.num_patches * configs.d_model, self.pred_len)
 
     def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         # x_enc: [B, T, N]
@@ -48,21 +63,23 @@ class Model(nn.Module):
         # Instance Normalization
         x_enc = self.revin(x_enc, 'norm')
 
-        # Independent Channel Embedding
-        x_enc_flat = x_enc.transpose(1, 2).reshape(B * N, T, 1)
-        x_mark_enc_flat = x_mark_enc.repeat_interleave(N, dim=0)
+        # Patch Embedding (Channel Independent)
+        # Transpose to [B, N, T] for your PatchEmbedding class
+        x_enc_patched = x_enc.transpose(1, 2)
 
-        enc_out = self.enc_embedding(x_enc_flat, x_mark_enc_flat)
+        # enc_out shape: [B*N, num_patches, d_model]
+        enc_out, n_vars = self.patch_embedding(x_enc_patched)
 
-        enc_out = enc_out.reshape(B, N, T, self.configs.d_model)
+        # Reshape for the Hybrid Layers: [B, N, num_patches, d_model]
+        enc_out = enc_out.reshape(B, n_vars, self.num_patches, self.configs.d_model)
 
         # Apply L Hybrid Layers
         for layer in self.layers:
             enc_out = layer(enc_out)
 
         # Projection
-        # Flatten Time and d_model: [B, N, T * d_model]
-        enc_out = enc_out.reshape(B, N, T * self.configs.d_model)
+        # Flatten Time (now num_patches) and d_model: [B, N, num_patches * d_model]
+        enc_out = enc_out.reshape(B, N, self.num_patches * self.configs.d_model)
 
         # Project to prediction length: [B, N, pred_len]
         dec_out = self.projection(enc_out)
