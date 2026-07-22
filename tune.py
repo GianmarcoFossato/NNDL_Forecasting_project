@@ -184,34 +184,42 @@ if __name__ == '__main__':
 
     # args.d_ff = args.d_model
     args.d_temp = args.d_model
-    exp = Exp_Long_Term_Forecast(args)
 
-    for ii in range(args.itr):
-        test_seed += 1
-        set_seed(test_seed)
-        setting = 'optimized_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}_{}'.format(
-            args.task_name,
-            args.model_id,
-            args.model,
-            args.data,
-            args.features,
-            args.seq_len,
-            args.label_len,
-            args.pred_len,
-            args.d_model,
-            args.n_heads,
-            args.e_layers,
-            args.d_layers,
-            args.d_ff,
-            args.expand,
-            args.d_conv,
-            args.factor,
-            args.embed,
-            args.distil,
-            args.des, ii, test_seed)
-        exp.train(setting)
+    # Prediction lengths to evaluate
+    target_pred_lens = [96, 192, 336, 720]
 
-        # Test the optimized model
-        exp.test(setting)
+    # Loop over each length the optimized model
+    for p_len in target_pred_lens:
+        args.pred_len = p_len
+
+        exp = Exp_Long_Term_Forecast(args)
+
+        for ii in range(args.itr):
+            test_seed += 1
+            set_seed(test_seed)
+            setting = 'optimized_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}_{}'.format(
+                args.task_name,
+                args.model_id,
+                args.model,
+                args.data,
+                args.features,
+                args.seq_len,
+                args.label_len,
+                args.pred_len,
+                args.d_model,
+                args.n_heads,
+                args.e_layers,
+                args.d_layers,
+                args.d_ff,
+                args.expand,
+                args.d_conv,
+                args.factor,
+                args.embed,
+                args.distil,
+                args.des, ii, test_seed)
+            exp.train(setting)
+
+            # Test the optimized model
+            exp.test(setting)
 
     logger.deactivate_file_logging()
