@@ -106,7 +106,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         test_loss_history = []
 
         for epoch in range(self.args.train_epochs):
-            # Recursively update current_epoch across all submodules that implement set_epoch
+            # Generic model epoch notification hook
             for module in self.model.modules():
                 if hasattr(module, 'set_epoch') and callable(module.set_epoch):
                     module.set_epoch(epoch)
@@ -297,9 +297,17 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('mse:{}, mae:{}, dtw:{}'.format(mse, mae, dtw))
+
+        # Query generic model hook for any optional diagnostic info (completely model-agnostic)
+        extra_info = ""
+        if hasattr(self.model, 'get_extra_info') and callable(self.model.get_extra_info):
+            extra_info = self.model.get_extra_info()
+
         f = open("result_long_term_forecast.txt", 'a')
         f.write(setting + "  \n")
         f.write('mse:{}, mae:{}, dtw:{}'.format(mse, mae, dtw))
+        if extra_info:
+            f.write(f" | {extra_info}")
         f.write('\n')
         f.write('\n')
         f.close()

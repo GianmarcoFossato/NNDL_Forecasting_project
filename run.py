@@ -207,8 +207,8 @@ def init_parser():
         '--ablation_mode',
         type=str,
         default='both',
-        choices=['both', 'branch_a', 'branch_b'],
-        help='Ablation mode: both (full hybrid), branch_a (periodicity only), or branch_b (cross-variate only)',
+        choices=['both', 'branch_a', 'branch_b', 'none', 'baseline'],
+        help='Ablation mode: both (full hybrid), branch_a (periodicity only), branch_b (cross-variate only), or none/baseline (no branch processing)',
     )
 
     # Tune configs file
@@ -276,7 +276,7 @@ if __name__ == '__main__':
 
             if args.no_compile:
                 setting += '_no_compile'
-            
+
             # Override setting for specific model to ensure proper checkpoint naming and logging
             if args.model == 'MambaSingleLayer' and args.task_name == 'classification':
                 setting = f'{args.task_name}_CLS_{args.model_id}_{args.model}_{args.data}_ft{args.features}' \

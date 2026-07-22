@@ -5,25 +5,22 @@ model_name="HyPT"
 
 # Architectural Hyperparameters
 D_MODEL=256
-D_PERIOD=16          # Decoupled Branch A dimension (1/4 of d_model)
+D_PERIOD=16
 D_FF=512
 N_HEADS=8
 E_LAYERS=2
 TOP_K=5
-PATCH_LEN=16         # Patch size for temporal embedding
+PATCH_LEN=16
 
 # Regularization & Training
-DROPOUT=0.1          # FFN, Patch, and Head dropout
-BRANCH_DROPOUT=0.1   # Hybrid path dropout
-BRANCH_WARMUP_EPOCHS=3
+DROPOUT=0.1
 LEARNING_RATE=0.0005
 EPOCHS=20
 PATIENCE=5
 BATCH_SIZE=32
 WORKERS=0
-LR_ADJ="type3"       # Gentler decay schedule for multi-channel convergence
+LR_ADJ="type3"
 
-# Common arguments string
 COMMON_ARGS="--task_name long_term_forecast \
   --is_training 1 \
   --root_path ./dataset/electricity/ \
@@ -46,33 +43,32 @@ COMMON_ARGS="--task_name long_term_forecast \
   --patch_len $PATCH_LEN \
   --top_k $TOP_K \
   --dropout $DROPOUT \
-  --branch_dropout $BRANCH_DROPOUT \
-  --branch_warmup_epochs $BRANCH_WARMUP_EPOCHS \
   --learning_rate $LEARNING_RATE \
   --train_epochs $EPOCHS \
   --patience $PATIENCE \
   --lradj $LR_ADJ \
-  --itr 1 \
   --batch_size $BATCH_SIZE \
   --num_workers $WORKERS \
   --no_compile"
 
-# Full Hybrid Model
-python -u run.py --model_id ECL_96_96_both  --pred_len 96  --ablation_mode both --des 'both' $COMMON_ARGS
-python -u run.py --model_id ECL_96_192_both --pred_len 192 --ablation_mode both --des 'both' $COMMON_ARGS
-python -u run.py --model_id ECL_96_336_both --pred_len 336 --ablation_mode both --des 'both' $COMMON_ARGS
-python -u run.py --model_id ECL_96_720_both --pred_len 720 --ablation_mode both --des 'both' $COMMON_ARGS
+# Evaluate across 3 seeds for statistically significant averages
+for SEED in 2021 2022 2023; do
+  for PRED_LEN in 96 192 336 720; do
 
-# Periodicity Branch Only
-python -u run.py --model_id ECL_96_96_branch_a  --pred_len 96  --ablation_mode branch_a --des 'branch_a' $COMMON_ARGS
-python -u run.py --model_id ECL_96_192_branch_a --pred_len 192 --ablation_mode branch_a --des 'branch_a' $COMMON_ARGS
-python -u run.py --model_id ECL_96_336_branch_a --pred_len 336 --ablation_mode branch_a --des 'branch_a' $COMMON_ARGS
-python -u run.py --model_id ECL_96_720_branch_a --pred_len 720 --ablation_mode branch_a --des 'branch_a' $COMMON_ARGS
+    # 1. Baseline Floor Control (No branches)
+    python -u run.py --model_id ECL_96_${PRED_LEN}_none_s${SEED} --pred_len $PRED_LEN --ablation_mode none --seed $SEED $COMMON_ARGS
 
-# Cross-Variate Branch Only
-python -u run.py --model_id ECL_96_96_branch_b  --pred_len 96  --ablation_mode branch_b --des 'branch_b' $COMMON_ARGS
-python -u run.py --model_id ECL_96_192_branch_b --pred_len 192 --ablation_mode branch_b --des 'branch_b' $COMMON_ARGS
-python -u run.py --model_id ECL_96_336_branch_b --pred_len 336 --ablation_mode branch_b --des 'branch_b' $COMMON_ARGS
-python -u run.py --model_id ECL_96_720_branch_b --pred_len 720 --ablation_mode branch_b --des 'branch_b' $COMMON_ARGS
+    # 2. Single Branch Baselines
+    python -u run.py --model_id ECL_96_${PRED_LEN}_branch_a_s${SEED} --pred_len $PRED_LEN --ablation_mode branch_a --seed $SEED $COMMON_ARGS
+    python -u run.py --model_id ECL_96_${PRED_LEN}_branch_b_s${SEED} --pred_len $PRED_LEN --ablation_mode branch_b --seed $SEED $COMMON_ARGS
 
-echo "All ${model_name} training jobs completed."
+    # 3. Full Hybrid (Standard Branch Dropout = 0.1)
+    python -u run.py --model_id ECL_96_${PRED_LEN}_both_s${SEED} --pred_len $PRED_LEN --ablation_mode both --branch_dropout 0.1 --seed $SEED $COMMON_ARGS
+
+    # 4. Full Hybrid (No Branch Dropout = 0.0)
+    python -u run.py --model_id ECL_96_${PRED_LEN}_both_nodrop_s${SEED} --pred_len $PRED_LEN --ablation_mode both --branch_dropout 0.0 --seed $SEED $COMMON_ARGS
+
+  done
+done
+
+echo "All sweep iterations finished."

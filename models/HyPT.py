@@ -89,3 +89,19 @@ class Model(nn.Module):
         dec_out = self.revin(dec_out, 'denorm')
 
         return dec_out
+
+    def get_extra_info(self) -> str:
+        """
+        Generic hook queried by exp_long_term_forecasting.
+        Encapsulates model-specific diagnostic logging.
+        """
+        gate_vals = []
+        for module in self.modules():
+            if hasattr(module, 'get_gate_value') and callable(module.get_gate_value):
+                val = module.get_gate_value()
+                if val is not None:
+                    gate_vals.append(round(val, 4))
+
+        if gate_vals:
+            return f"gates: {gate_vals}"
+        return ""
