@@ -296,12 +296,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             dtw = 'Not calculated'
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
-        print('mse:{}, mae:{}, dtw:{}'.format(mse, mae, dtw))
 
         # Query generic model hook for any optional diagnostic info (completely model-agnostic)
         extra_info = ""
         if hasattr(self.model, 'get_extra_info') and callable(self.model.get_extra_info):
             extra_info = self.model.get_extra_info()
+
+        print_msg = 'mse:{}, mae:{}, dtw:{}'.format(mse, mae, dtw)
+        if extra_info:
+            print_msg += f' | {extra_info}'
+        print(print_msg)
 
         f = open("result_long_term_forecast.txt", 'a')
         f.write(setting + "  \n")

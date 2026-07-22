@@ -219,13 +219,13 @@ def init_parser():
 if __name__ == '__main__':
     logger = OutputLogger()
 
-    fix_seed = 2021
+    parser = init_parser()
+    args = parser.parse_args()
+
+    fix_seed = args.seed
     random.seed(fix_seed)
     torch.manual_seed(fix_seed)
     np.random.seed(fix_seed)
-
-    parser = init_parser()
-    args = parser.parse_args()
 
     if torch.cuda.is_available() and args.use_gpu:
         args.device = torch.device('cuda:{}'.format(args.gpu))
