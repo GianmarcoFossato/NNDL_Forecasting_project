@@ -55,18 +55,19 @@ COMMON_ARGS="--task_name long_term_forecast \
 for SEED in 2021 2022 2023; do
   for PRED_LEN in 96 192 336 720; do
 
-    # 1. Baseline Floor Control (No branches)
+    # Full Hybrid (Standard Branch Dropout = 0.1)
+    python -u run.py --model_id ECL_96_${PRED_LEN}_both_s${SEED} --pred_len $PRED_LEN --ablation_mode both --branch_dropout 0.1 --seed $SEED $COMMON_ARGS
+
+    # Full Hybrid (No Branch Dropout = 0.0)
+    python -u run.py --model_id ECL_96_${PRED_LEN}_both_nodrop_s${SEED} --pred_len $PRED_LEN --ablation_mode both --branch_dropout 0.0 --seed $SEED $COMMON_ARGS
+
+    # Baseline Floor Control (No branches)
     python -u run.py --model_id ECL_96_${PRED_LEN}_none_s${SEED} --pred_len $PRED_LEN --ablation_mode none --seed $SEED $COMMON_ARGS
 
-    # 2. Single Branch Baselines
+    # Single Branch Baselines
     python -u run.py --model_id ECL_96_${PRED_LEN}_branch_a_s${SEED} --pred_len $PRED_LEN --ablation_mode branch_a --seed $SEED $COMMON_ARGS
     python -u run.py --model_id ECL_96_${PRED_LEN}_branch_b_s${SEED} --pred_len $PRED_LEN --ablation_mode branch_b --seed $SEED $COMMON_ARGS
 
-    # 3. Full Hybrid (Standard Branch Dropout = 0.1)
-    python -u run.py --model_id ECL_96_${PRED_LEN}_both_s${SEED} --pred_len $PRED_LEN --ablation_mode both --branch_dropout 0.1 --seed $SEED $COMMON_ARGS
-
-    # 4. Full Hybrid (No Branch Dropout = 0.0)
-    python -u run.py --model_id ECL_96_${PRED_LEN}_both_nodrop_s${SEED} --pred_len $PRED_LEN --ablation_mode both --branch_dropout 0.0 --seed $SEED $COMMON_ARGS
 
   done
 done
