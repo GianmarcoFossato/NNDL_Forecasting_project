@@ -214,6 +214,8 @@ def init_parser():
     # Tune configs file
     parser.add_argument('--path_to_hp_config', type=str, default=None, help='Path to hyperparameter config file (json)')
 
+    # Output subfolder
+    parser.add_argument('--results_subfolder', type=str, default='evaluation', help='subfolder inside test_results to save outputs')
     return parser
 
 if __name__ == '__main__':
@@ -285,7 +287,8 @@ if __name__ == '__main__':
                         + f'_tvdt{int(args.tv_dt)}_tvB{int(args.tv_B)}_tvC{int(args.tv_C)}_useD{int(args.use_D)}_{args.des}_{ii}'
 
             # Activate file writing: flushes memory buffer to disk and hooks live stdout
-            logger.activate_file_logging(os.path.join('./test_results', setting))
+            results_dir = os.path.join('./test_results', args.results_subfolder, setting)
+            logger.activate_file_logging(results_dir)
 
 
             print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
@@ -334,7 +337,8 @@ if __name__ == '__main__':
                     + f'_expand{args.expand}_dc{args.d_conv}_nk{args.num_kernels}' \
                     + f'_tvdt{args.tv_dt}_tvB{args.tv_B}_tvC{args.tv_C}_useD{int(args.use_D)}_{args.des}_{ii}'
 
-        logger.activate_file_logging(os.path.join('./test_results', setting))
+        results_dir = os.path.join('./test_results', args.results_subfolder, setting)
+        logger.activate_file_logging(results_dir)
 
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
         exp.test(setting, test=1)

@@ -2,6 +2,7 @@
 export CUDA_VISIBLE_DEVICES=0
 
 model_name="HyPT"
+SUBFOLDER="ablation"
 
 # Architectural Hyperparameters
 D_MODEL=256
@@ -49,6 +50,7 @@ COMMON_ARGS="--task_name long_term_forecast \
   --lradj $LR_ADJ \
   --batch_size $BATCH_SIZE \
   --num_workers $WORKERS \
+  --results_subfolder $SUBFOLDER \
   --no_compile"
 
 SEED=2021

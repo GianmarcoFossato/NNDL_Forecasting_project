@@ -198,7 +198,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 vali_losses=vali_loss_history,
                 test_losses=test_loss_history,
                 checkpoints_dir=self.args.checkpoints,
-                results_dir='./test_results',
+                results_dir=os.path.join('./test_results', getattr(self.args, 'results_subfolder', 'evaluation')),
                 setting=setting,
                 model_name=self.args.model
             )
@@ -216,7 +216,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         preds = []
         trues = []
-        folder_path = './test_results/' + setting + '/'
+        subfolder = getattr(self.args, 'results_subfolder', 'evaluation')
+        folder_path = os.path.join('./test_results', subfolder, setting) + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -276,7 +277,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         print('test shape:', preds.shape, trues.shape)
 
         # result save
-        folder_path = './results/' + setting + '/'
+        results_path = os.path.join('./results', subfolder, setting) + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
