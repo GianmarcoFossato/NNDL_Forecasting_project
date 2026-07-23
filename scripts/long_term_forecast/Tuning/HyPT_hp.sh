@@ -19,4 +19,5 @@ python -u tune.py \
   --patience 5 \
   --num_workers 0 \
   --no_compile \
+  --results_subfolder "tuning" \
   --path_to_hp_config scripts/long_term_forecast/Tuning/HyPT_config.json

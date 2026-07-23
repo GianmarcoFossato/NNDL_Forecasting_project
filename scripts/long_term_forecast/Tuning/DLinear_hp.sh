@@ -15,4 +15,5 @@ python -u tune.py \
   --c_out 321 \
   --num_workers 0 \
   --train_epochs 1 \
+  --results_subfolder "tuning" \
   --path_to_hp_config scripts/long_term_forecast/Tuning/DLinear_config.json

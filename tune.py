@@ -11,11 +11,12 @@ import json
 import shutil
 
 def save_trials_callback(study, trial, args):
-    model_dir = f'test_results/hp_search_{args.model_id}_{args.model}'
+    subfolder = getattr(args, 'results_subfolder', 'evaluation')
+    model_dir = os.path.join('test_results', subfolder, f'hp_search_{args.model_id}_{args.model}')
     os.makedirs(model_dir, exist_ok=True)
 
     df = study.trials_dataframe()
-    last_trial_file = f'{model_dir}/trials_{args.model}_{args.model_id}.csv'
+    last_trial_file = os.path.join(model_dir, f'trials_{args.model}_{args.model_id}.csv')
     df.to_csv(last_trial_file, index=False)
 
 def suggest_params(trial, args, hp_configs):
@@ -55,14 +56,16 @@ def suggest_params(trial, args, hp_configs):
 
     # Fix the feedforward dimension to be equal to d_model for the HP search
     # args.d_ff = args.d_model
+
     return args
 
 
 def objective_func(trial, args, hp_configs, logger):
-    setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
+    subfolder = getattr(args, 'results_subfolder', 'evaluation')
+    setting = os.path.join(f'hp_search_{args.model_id}_{args.model}', f'trial_{trial.number}')
 
     try:
-        # collect suggested hyperparameters
+        # Collect suggested hyperparameters
         args = suggest_params(trial, args, hp_configs)
         exp = Exp_Long_Term_Forecast(args)
         #setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
@@ -91,10 +94,11 @@ def objective_func(trial, args, hp_configs, logger):
     except Exception as e:
         print(f"Trial {trial.number} failed with error: {str(e)}")
 
-        os.makedirs('test_results', exist_ok=True)
+        error_dir = os.path.join('test_results', subfolder)
+        os.makedirs(error_dir, exist_ok=True)
 
-        # log error details
-        with open('test_results/failed_trials.log', 'a') as f:
+        # Log error details to the dynamic subfolder
+        with open(os.path.join(error_dir, 'failed_trials.log'), 'a') as f:
             f.write(f"Trial {trial.number} failed:\nParameters: {trial.params}\nError: {str(e)}\n\n")
         return float('inf')
 
@@ -132,12 +136,12 @@ if __name__ == '__main__':
     # Ensure 'is_training' is set to True
     args.is_training = 1
 
-    # Global to track last file
-    last_trial_file = None
+    # Dynamically select subfolder (default: 'evaluation')
+    subfolder = getattr(args, 'results_subfolder', 'evaluation')
 
     # Persistent SQLite file for later visualization
     study_folder = f"hp_search_{args.model_id}_{args.model}"
-    db_dir = os.path.join('test_results', study_folder)
+    db_dir = os.path.join('test_results', subfolder, study_folder)
     os.makedirs(db_dir, exist_ok=True)
     logger.activate_file_logging(db_dir)
 
