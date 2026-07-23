@@ -28,10 +28,10 @@
         "choices": [128, 256, 512]
       }
     },
-    "d_ff": {
+    "d_ff_mult": {
       "type": "categorical",
       "kwargs": {
-        "choices": [256, 512, 1024]
+        "choices": [1, 2, 4]
       }
     },
     "n_heads": {

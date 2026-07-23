@@ -58,16 +58,19 @@ def suggest_params(trial, args, hp_configs):
         setattr(args, 'd_model', d_model_val)
         sampled['d_model'] = d_model_val
 
-    # Sample d_ff while enforcing d_ff >= d_model
-    if 'd_ff' in parameters:
+    # Sample d_ff as a multiple of d_model. This guarantees d_ff >= d_model
+    # structurally, without changing the set of choices Optuna sees for
+    # a given parameter name across trials.
+    if 'd_ff_mult' in parameters and 'd_model' in sampled:
+        p_kwargs = parameters['d_ff_mult']['kwargs']
+        mult = trial.suggest_categorical('d_ff_mult', **p_kwargs)
+        d_ff_val = sampled['d_model'] * mult
+        setattr(args, 'd_ff', d_ff_val)
+        sampled['d_ff_mult'] = mult
+    elif 'd_ff' in parameters:
         p_kwargs = parameters['d_ff']['kwargs']
         p_type = parameters['d_ff']['type']
-        if 'd_model' in sampled and p_type == 'categorical':
-            valid_choices = [c for c in p_kwargs['choices'] if c >= sampled['d_model']]
-            if not valid_choices:
-                valid_choices = [sampled['d_model']]
-            d_ff_val = trial.suggest_categorical('d_ff', choices=valid_choices)
-        elif p_type == 'categorical':
+        if p_type == 'categorical':
             d_ff_val = trial.suggest_categorical('d_ff', **p_kwargs)
         elif p_type == 'int':
             d_ff_val = trial.suggest_int('d_ff', **p_kwargs)
