@@ -2,7 +2,7 @@
 export CUDA_VISIBLE_DEVICES=0
 
 model_name="HyPT"
-SUBFOLDER="ablation/SEED 2023"
+SUBFOLDER="ablation/SEED_2023"
 
 # Architectural Hyperparameters
 D_MODEL=256
