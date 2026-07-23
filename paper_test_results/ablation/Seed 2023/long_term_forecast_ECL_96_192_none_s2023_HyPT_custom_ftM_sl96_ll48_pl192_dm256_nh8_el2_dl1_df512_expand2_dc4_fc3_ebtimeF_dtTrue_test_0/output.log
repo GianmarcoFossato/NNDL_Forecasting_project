@@ -1,0 +1,377 @@
+Using GPU
+Args in experiment:
+[1mBasic Config[0m
+  Task Name:          long_term_forecast  Is Training:        1                   
+  Model ID:           ECL_96_192_none_s2023Model:              HyPT                
+
+[1mData Loader[0m
+  Data:               custom              Root Path:          ./dataset/electricity/
+  Data Path:          electricity.csv     Features:           M                   
+  Target:             OT                  Freq:               h                   
+  Checkpoints:        ./checkpoints/      
+
+[1mForecasting Task[0m
+  Seq Len:            96                  Label Len:          48                  
+  Pred Len:           192                 Seasonal Patterns:  Monthly             
+  Inverse:            0                   
+
+[1mModel Parameters[0m
+  Top k:              5                   Num Kernels:        6                   
+  Enc In:             321                 Dec In:             321                 
+  C Out:              321                 d model:            256                 
+  n heads:            8                   e layers:           2                   
+  d layers:           1                   d FF:               512                 
+  Moving Avg:         25                  Factor:             3                   
+  Distil:             1                   Dropout:            0.1                 
+  Branch Dropout:     0.1                 Warmup Epochs:      3                   
+  Embed:              timeF               Activation:         gelu                
+
+[1mRun Parameters[0m
+  Num Workers:        0                   Itr:                1                   
+  Train Epochs:       20                  Batch Size:         32                  
+  Patience:           5                   Learning Rate:      0.0005              
+  Des:                test                Loss:               MSE                 
+  Lradj:              type3               Use Amp:            0                   
+
+[1mGPU[0m
+  Use GPU:            1                   GPU:                0                   
+  Use Multi GPU:      0                   Devices:            0,1,2,3             
+
+[1mDe-stationary Projector Params[0m
+  P Hidden Dims:      128, 128            P Hidden Layers:    2                   
+
+Use GPU: cuda:0
+🚀 Lazy Loading: HyPT ...
+>>>>>>>start training : long_term_forecast_ECL_96_192_none_s2023_HyPT_custom_ftM_sl96_ll48_pl192_dm256_nh8_el2_dl1_df512_expand2_dc4_fc3_ebtimeF_dtTrue_test_0>>>>>>>>>>>>>>>>>>>>>>>>>>
+Preloading dataset directly to GPU VRAM...
+train 18125
+Preloading dataset directly to GPU VRAM...
+val 2441
+Preloading dataset directly to GPU VRAM...
+test 5069
+	iters: 100, epoch: 1 | loss: 0.2348899
+	speed: 0.0340s/iter; left time: 382.4661s
+	iters: 200, epoch: 1 | loss: 0.2336525
+	speed: 0.0187s/iter; left time: 208.5613s
+	iters: 300, epoch: 1 | loss: 0.2287766
+	speed: 0.0184s/iter; left time: 203.2332s
+	iters: 400, epoch: 1 | loss: 0.2238262
+	speed: 0.0184s/iter; left time: 200.9406s
+	iters: 500, epoch: 1 | loss: 0.2038794
+	speed: 0.0184s/iter; left time: 199.0330s
+Epoch: 1 cost time: 10.962548732757568
+Epoch: 1, Steps: 567 | Train Loss: 0.2365914 Vali Loss: 0.1705332 Test Loss: 0.1966889
+Validation loss decreased (inf --> 0.170533).  Saving model ...
+Updating learning rate to 0.0005
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 2 | loss: 0.2103307
+	speed: 0.0503s/iter; left time: 536.3848s
+	iters: 200, epoch: 2 | loss: 0.1754197
+	speed: 0.0184s/iter; left time: 194.1292s
+	iters: 300, epoch: 2 | loss: 0.2135690
+	speed: 0.0184s/iter; left time: 192.5341s
+	iters: 400, epoch: 2 | loss: 0.1972481
+	speed: 0.0184s/iter; left time: 190.6502s
+	iters: 500, epoch: 2 | loss: 0.1854858
+	speed: 0.0184s/iter; left time: 188.7549s
+Epoch: 2 cost time: 10.406017065048218
+Epoch: 2, Steps: 567 | Train Loss: 0.1983394 Vali Loss: 0.1695020 Test Loss: 0.1926936
+Validation loss decreased (0.170533 --> 0.169502).  Saving model ...
+Updating learning rate to 0.0005
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 3 | loss: 0.1875257
+	speed: 0.0484s/iter; left time: 488.8193s
+	iters: 200, epoch: 3 | loss: 0.1925271
+	speed: 0.0184s/iter; left time: 183.8933s
+	iters: 300, epoch: 3 | loss: 0.1829279
+	speed: 0.0184s/iter; left time: 182.0344s
+	iters: 400, epoch: 3 | loss: 0.1940419
+	speed: 0.0184s/iter; left time: 180.3157s
+	iters: 500, epoch: 3 | loss: 0.1897867
+	speed: 0.0184s/iter; left time: 178.5491s
+Epoch: 3 cost time: 10.411603927612305
+Epoch: 3, Steps: 567 | Train Loss: 0.1920967 Vali Loss: 0.1680089 Test Loss: 0.1880926
+Validation loss decreased (0.169502 --> 0.168009).  Saving model ...
+Updating learning rate to 0.0005
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 4 | loss: 0.1965251
+	speed: 0.0486s/iter; left time: 463.5334s
+	iters: 200, epoch: 4 | loss: 0.1865575
+	speed: 0.0184s/iter; left time: 173.4727s
+	iters: 300, epoch: 4 | loss: 0.2001853
+	speed: 0.0184s/iter; left time: 171.5802s
+	iters: 400, epoch: 4 | loss: 0.1740425
+	speed: 0.0184s/iter; left time: 169.9359s
+	iters: 500, epoch: 4 | loss: 0.1756968
+	speed: 0.0184s/iter; left time: 168.0561s
+Epoch: 4 cost time: 10.414106845855713
+Epoch: 4, Steps: 567 | Train Loss: 0.1865119 Vali Loss: 0.1623075 Test Loss: 0.1840011
+Validation loss decreased (0.168009 --> 0.162308).  Saving model ...
+Updating learning rate to 0.00045000000000000004
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 5 | loss: 0.1679732
+	speed: 0.0485s/iter; left time: 434.9234s
+	iters: 200, epoch: 5 | loss: 0.1749675
+	speed: 0.0184s/iter; left time: 163.2905s
+	iters: 300, epoch: 5 | loss: 0.1674514
+	speed: 0.0184s/iter; left time: 161.5316s
+	iters: 400, epoch: 5 | loss: 0.1752568
+	speed: 0.0184s/iter; left time: 159.4925s
+	iters: 500, epoch: 5 | loss: 0.1719607
+	speed: 0.0184s/iter; left time: 157.7183s
+Epoch: 5 cost time: 10.418261528015137
+Epoch: 5, Steps: 567 | Train Loss: 0.1829964 Vali Loss: 0.1594549 Test Loss: 0.1817537
+Validation loss decreased (0.162308 --> 0.159455).  Saving model ...
+Updating learning rate to 0.00040500000000000003
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 6 | loss: 0.1622345
+	speed: 0.0492s/iter; left time: 413.5695s
+	iters: 200, epoch: 6 | loss: 0.1915338
+	speed: 0.0184s/iter; left time: 152.8984s
+	iters: 300, epoch: 6 | loss: 0.1613563
+	speed: 0.0184s/iter; left time: 150.9652s
+	iters: 400, epoch: 6 | loss: 0.1796904
+	speed: 0.0184s/iter; left time: 149.1499s
+	iters: 500, epoch: 6 | loss: 0.1792920
+	speed: 0.0184s/iter; left time: 147.2572s
+Epoch: 6 cost time: 10.419880390167236
+Epoch: 6, Steps: 567 | Train Loss: 0.1811670 Vali Loss: 0.1583160 Test Loss: 0.1808870
+Validation loss decreased (0.159455 --> 0.158316).  Saving model ...
+Updating learning rate to 0.0003645000000000001
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 7 | loss: 0.1867199
+	speed: 0.0482s/iter; left time: 378.1187s
+	iters: 200, epoch: 7 | loss: 0.1914853
+	speed: 0.0184s/iter; left time: 142.4410s
+	iters: 300, epoch: 7 | loss: 0.1848186
+	speed: 0.0184s/iter; left time: 140.7979s
+	iters: 400, epoch: 7 | loss: 0.1854931
+	speed: 0.0184s/iter; left time: 138.6459s
+	iters: 500, epoch: 7 | loss: 0.1875609
+	speed: 0.0184s/iter; left time: 136.8629s
+Epoch: 7 cost time: 10.422555208206177
+Epoch: 7, Steps: 567 | Train Loss: 0.1797882 Vali Loss: 0.1574262 Test Loss: 0.1798484
+Validation loss decreased (0.158316 --> 0.157426).  Saving model ...
+Updating learning rate to 0.00032805000000000003
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 8 | loss: 0.1980835
+	speed: 0.0485s/iter; left time: 352.6590s
+	iters: 200, epoch: 8 | loss: 0.1659979
+	speed: 0.0184s/iter; left time: 131.9851s
+	iters: 300, epoch: 8 | loss: 0.1848736
+	speed: 0.0184s/iter; left time: 130.2195s
+	iters: 400, epoch: 8 | loss: 0.1732125
+	speed: 0.0184s/iter; left time: 128.4664s
+	iters: 500, epoch: 8 | loss: 0.1817298
+	speed: 0.0184s/iter; left time: 126.4321s
+Epoch: 8 cost time: 10.424771308898926
+Epoch: 8, Steps: 567 | Train Loss: 0.1788428 Vali Loss: 0.1553210 Test Loss: 0.1785544
+Validation loss decreased (0.157426 --> 0.155321).  Saving model ...
+Updating learning rate to 0.000295245
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 9 | loss: 0.1927982
+	speed: 0.0484s/iter; left time: 324.7109s
+	iters: 200, epoch: 9 | loss: 0.1746090
+	speed: 0.0184s/iter; left time: 121.4914s
+	iters: 300, epoch: 9 | loss: 0.1700103
+	speed: 0.0184s/iter; left time: 119.7788s
+	iters: 400, epoch: 9 | loss: 0.1897913
+	speed: 0.0184s/iter; left time: 117.9282s
+	iters: 500, epoch: 9 | loss: 0.1814545
+	speed: 0.0184s/iter; left time: 116.0010s
+Epoch: 9 cost time: 10.42302918434143
+Epoch: 9, Steps: 567 | Train Loss: 0.1780431 Vali Loss: 0.1549790 Test Loss: 0.1779656
+Validation loss decreased (0.155321 --> 0.154979).  Saving model ...
+Updating learning rate to 0.0002657205
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 10 | loss: 0.2085793
+	speed: 0.0488s/iter; left time: 299.5647s
+	iters: 200, epoch: 10 | loss: 0.1861478
+	speed: 0.0184s/iter; left time: 111.2212s
+	iters: 300, epoch: 10 | loss: 0.1700056
+	speed: 0.0184s/iter; left time: 109.3391s
+	iters: 400, epoch: 10 | loss: 0.2016861
+	speed: 0.0184s/iter; left time: 107.4033s
+	iters: 500, epoch: 10 | loss: 0.1763096
+	speed: 0.0184s/iter; left time: 105.5570s
+Epoch: 10 cost time: 10.423272848129272
+Epoch: 10, Steps: 567 | Train Loss: 0.1774461 Vali Loss: 0.1537946 Test Loss: 0.1776678
+Validation loss decreased (0.154979 --> 0.153795).  Saving model ...
+Updating learning rate to 0.00023914845000000005
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 11 | loss: 0.1788493
+	speed: 0.0480s/iter; left time: 267.3026s
+	iters: 200, epoch: 11 | loss: 0.1520982
+	speed: 0.0184s/iter; left time: 100.7412s
+	iters: 300, epoch: 11 | loss: 0.1712627
+	speed: 0.0184s/iter; left time: 98.8874s
+	iters: 400, epoch: 11 | loss: 0.1703530
+	speed: 0.0184s/iter; left time: 96.9975s
+	iters: 500, epoch: 11 | loss: 0.1693747
+	speed: 0.0184s/iter; left time: 95.2684s
+Epoch: 11 cost time: 10.426109075546265
+Epoch: 11, Steps: 567 | Train Loss: 0.1768116 Vali Loss: 0.1541841 Test Loss: 0.1779823
+EarlyStopping counter: 1 out of 5
+Updating learning rate to 0.00021523360500000005
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 12 | loss: 0.1682015
+	speed: 0.0478s/iter; left time: 239.4372s
+	iters: 200, epoch: 12 | loss: 0.1572880
+	speed: 0.0184s/iter; left time: 90.3043s
+	iters: 300, epoch: 12 | loss: 0.1855761
+	speed: 0.0184s/iter; left time: 88.5177s
+	iters: 400, epoch: 12 | loss: 0.1718526
+	speed: 0.0184s/iter; left time: 86.5779s
+	iters: 500, epoch: 12 | loss: 0.1874915
+	speed: 0.0184s/iter; left time: 84.7259s
+Epoch: 12 cost time: 10.424037456512451
+Epoch: 12, Steps: 567 | Train Loss: 0.1763451 Vali Loss: 0.1533390 Test Loss: 0.1769658
+Validation loss decreased (0.153795 --> 0.153339).  Saving model ...
+Updating learning rate to 0.00019371024450000004
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 13 | loss: 0.1827153
+	speed: 0.0478s/iter; left time: 212.2505s
+	iters: 200, epoch: 13 | loss: 0.1728994
+	speed: 0.0184s/iter; left time: 79.8044s
+	iters: 300, epoch: 13 | loss: 0.1724850
+	speed: 0.0184s/iter; left time: 77.9865s
+	iters: 400, epoch: 13 | loss: 0.1884438
+	speed: 0.0184s/iter; left time: 76.1487s
+	iters: 500, epoch: 13 | loss: 0.1616299
+	speed: 0.0184s/iter; left time: 74.3891s
+Epoch: 13 cost time: 10.423880338668823
+Epoch: 13, Steps: 567 | Train Loss: 0.1758364 Vali Loss: 0.1532132 Test Loss: 0.1765932
+Validation loss decreased (0.153339 --> 0.153213).  Saving model ...
+Updating learning rate to 0.00017433922005000006
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 14 | loss: 0.1838553
+	speed: 0.0479s/iter; left time: 185.3431s
+	iters: 200, epoch: 14 | loss: 0.1693258
+	speed: 0.0184s/iter; left time: 69.4163s
+	iters: 300, epoch: 14 | loss: 0.1711957
+	speed: 0.0184s/iter; left time: 67.5609s
+	iters: 400, epoch: 14 | loss: 0.1791221
+	speed: 0.0184s/iter; left time: 65.7064s
+	iters: 500, epoch: 14 | loss: 0.2001542
+	speed: 0.0184s/iter; left time: 63.8706s
+Epoch: 14 cost time: 10.421647310256958
+Epoch: 14, Steps: 567 | Train Loss: 0.1755634 Vali Loss: 0.1528839 Test Loss: 0.1768888
+Validation loss decreased (0.153213 --> 0.152884).  Saving model ...
+Updating learning rate to 0.00015690529804500005
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 15 | loss: 0.1656253
+	speed: 0.0484s/iter; left time: 159.7051s
+	iters: 200, epoch: 15 | loss: 0.1674554
+	speed: 0.0184s/iter; left time: 58.9182s
+	iters: 300, epoch: 15 | loss: 0.1717664
+	speed: 0.0184s/iter; left time: 57.0772s
+	iters: 400, epoch: 15 | loss: 0.1653197
+	speed: 0.0184s/iter; left time: 55.2213s
+	iters: 500, epoch: 15 | loss: 0.1751988
+	speed: 0.0184s/iter; left time: 53.4312s
+Epoch: 15 cost time: 10.419349908828735
+Epoch: 15, Steps: 567 | Train Loss: 0.1751846 Vali Loss: 0.1527591 Test Loss: 0.1761271
+Validation loss decreased (0.152884 --> 0.152759).  Saving model ...
+Updating learning rate to 0.00014121476824050004
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 16 | loss: 0.1724642
+	speed: 0.0485s/iter; left time: 132.6366s
+	iters: 200, epoch: 16 | loss: 0.1961315
+	speed: 0.0184s/iter; left time: 48.5433s
+	iters: 300, epoch: 16 | loss: 0.1729779
+	speed: 0.0184s/iter; left time: 46.6680s
+	iters: 400, epoch: 16 | loss: 0.1631921
+	speed: 0.0184s/iter; left time: 44.9182s
+	iters: 500, epoch: 16 | loss: 0.1614448
+	speed: 0.0184s/iter; left time: 43.0128s
+Epoch: 16 cost time: 10.428208351135254
+Epoch: 16, Steps: 567 | Train Loss: 0.1748424 Vali Loss: 0.1523579 Test Loss: 0.1756657
+Validation loss decreased (0.152759 --> 0.152358).  Saving model ...
+Updating learning rate to 0.00012709329141645005
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 17 | loss: 0.1705934
+	speed: 0.0479s/iter; left time: 103.9929s
+	iters: 200, epoch: 17 | loss: 0.1741247
+	speed: 0.0184s/iter; left time: 38.1090s
+	iters: 300, epoch: 17 | loss: 0.1669751
+	speed: 0.0184s/iter; left time: 36.2535s
+	iters: 400, epoch: 17 | loss: 0.1662885
+	speed: 0.0184s/iter; left time: 34.4000s
+	iters: 500, epoch: 17 | loss: 0.1854657
+	speed: 0.0184s/iter; left time: 32.5548s
+Epoch: 17 cost time: 10.423928260803223
+Epoch: 17, Steps: 567 | Train Loss: 0.1745716 Vali Loss: 0.1527510 Test Loss: 0.1757407
+EarlyStopping counter: 1 out of 5
+Updating learning rate to 0.00011438396227480505
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 18 | loss: 0.1859871
+	speed: 0.0479s/iter; left time: 76.6832s
+	iters: 200, epoch: 18 | loss: 0.1790667
+	speed: 0.0184s/iter; left time: 27.6398s
+	iters: 300, epoch: 18 | loss: 0.1826116
+	speed: 0.0184s/iter; left time: 25.8103s
+	iters: 400, epoch: 18 | loss: 0.1679766
+	speed: 0.0184s/iter; left time: 23.9569s
+	iters: 500, epoch: 18 | loss: 0.1853327
+	speed: 0.0184s/iter; left time: 22.1188s
+Epoch: 18 cost time: 10.42167854309082
+Epoch: 18, Steps: 567 | Train Loss: 0.1743682 Vali Loss: 0.1525981 Test Loss: 0.1757314
+EarlyStopping counter: 2 out of 5
+Updating learning rate to 0.00010294556604732454
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 19 | loss: 0.1595781
+	speed: 0.0479s/iter; left time: 49.5757s
+	iters: 200, epoch: 19 | loss: 0.1681195
+	speed: 0.0184s/iter; left time: 17.1969s
+	iters: 300, epoch: 19 | loss: 0.1862313
+	speed: 0.0184s/iter; left time: 15.3577s
+	iters: 400, epoch: 19 | loss: 0.1732329
+	speed: 0.0184s/iter; left time: 13.5183s
+	iters: 500, epoch: 19 | loss: 0.1569670
+	speed: 0.0184s/iter; left time: 11.6851s
+Epoch: 19 cost time: 10.41824197769165
+Epoch: 19, Steps: 567 | Train Loss: 0.1741469 Vali Loss: 0.1510684 Test Loss: 0.1756025
+Validation loss decreased (0.152358 --> 0.151068).  Saving model ...
+Updating learning rate to 9.265100944259208e-05
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+	iters: 100, epoch: 20 | loss: 0.1802434
+	speed: 0.0484s/iter; left time: 22.6470s
+	iters: 200, epoch: 20 | loss: 0.1722365
+	speed: 0.0184s/iter; left time: 6.7670s
+	iters: 300, epoch: 20 | loss: 0.1713363
+	speed: 0.0184s/iter; left time: 4.9358s
+	iters: 400, epoch: 20 | loss: 0.1807622
+	speed: 0.0184s/iter; left time: 3.0895s
+	iters: 500, epoch: 20 | loss: 0.1643804
+	speed: 0.0184s/iter; left time: 1.2517s
+Epoch: 20 cost time: 10.419900894165039
+Epoch: 20, Steps: 567 | Train Loss: 0.1739772 Vali Loss: 0.1518300 Test Loss: 0.1750430
+EarlyStopping counter: 1 out of 5
+Updating learning rate to 8.338590849833288e-05
+Saved complete loss metrics CSV to checkpoints and test_results.
+Saved loss curve visualization to checkpoints and test_results.
+>>>>>>>testing : long_term_forecast_ECL_96_192_none_s2023_HyPT_custom_ftM_sl96_ll48_pl192_dm256_nh8_el2_dl1_df512_expand2_dc4_fc3_ebtimeF_dtTrue_test_0<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+Preloading dataset directly to GPU VRAM...
+test 5069
+test shape: (5069, 192, 321) (5069, 192, 321)
+test shape: (5069, 192, 321) (5069, 192, 321)
+mse:0.17457161843776703, mae:0.2622399628162384, dtw:Not calculated
