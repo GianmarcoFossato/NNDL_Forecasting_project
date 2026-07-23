@@ -181,7 +181,7 @@ def _(execution_mode, mo, model_selector):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Fine Tuning a Model
+    ## Fine Tuning HyPT
     The following cell blocks allow fine-tuning of a specific model.
     """)
     return
@@ -207,7 +207,7 @@ def _(REPO_NAME, execution_mode, mo, subprocess):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Execute Training Experiments
+    ## Evaluation of HyPT and baselines
     Executes scripts assigned to run evaluation processes for implemented models.
     """)
     return
@@ -336,7 +336,7 @@ def _(execution_mode, mo, model_selector, subprocess):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Run HyPT Ablation Study
+    ## HyPT Ablation Study
 
     This pipeline runs the ablation scripts, comparing individual and combined architectural components of HyPT across seeds 2021, 2022, and 2023.
     """)
@@ -515,9 +515,7 @@ def _(Path, execution_mode, mo, pd, re, results_source):
     </style>
     """
 
-    # -------------------------------------------------------------
-    # 1. EVALUATION TABLE FORMATTER
-    # -------------------------------------------------------------
+    # Evaluation table formatter
     def format_evaluation_results(b_dir: Path) -> str:
         log_files = list(b_dir.glob("**/output.log"))
         if not log_files:
@@ -637,9 +635,7 @@ def _(Path, execution_mode, mo, pd, re, results_source):
         html += "</tbody></table>"
         return html
 
-    # -------------------------------------------------------------
-    # 2. ABLATION TABLE FORMATTER (Per Seed + Seed Average)
-    # -------------------------------------------------------------
+    # Ablation table formatter (per Seed + Seed Average)
     def format_ablation_results(b_dir: Path) -> str:
         log_files = list(b_dir.glob("**/output.log"))
         if not log_files:
@@ -804,9 +800,7 @@ def _(Path, execution_mode, mo, pd, re, results_source):
         html += "</tbody></table>"
         return html
 
-    # -------------------------------------------------------------
-    # 3. HYPERPARAMETER TUNING FORMATTER
-    # -------------------------------------------------------------
+    # Hyperparameter tuning table formatter
     def format_tuning_results(b_dir: Path) -> str:
         log_files = list(b_dir.glob("**/output.log")) + list(b_dir.glob("output.log"))
         if not log_files and not (b_dir.exists() and list(b_dir.iterdir())):
@@ -835,38 +829,38 @@ def _(Path, execution_mode, mo, pd, re, results_source):
             mse_val = "-"
             mae_val = "-"
 
+            # Filter directories to find one with a valid output.log
             if matching_dirs:
-                folder = matching_dirs[0]
-                dm = re.search(r"_dm(\d+)_", folder.name)
-                nh = re.search(r"_nh(\d+)_", folder.name)
-                el = re.search(r"_el(\d+)_", folder.name)
-                df = re.search(r"_df(\d+)_", folder.name)
+                for folder in matching_dirs:
+                    folder_log = folder / "output.log"
+                    if folder_log.exists():
+                        try:
+                            f_content = folder_log.read_text(encoding="utf-8")
+                            m = metric_pattern.findall(f_content)
+                            if m:
+                                mse_val = f"{float(m[-1][0]):.3f}"
+                                mae_val = f"{float(m[-1][1]):.3f}"
 
-                config_parts = []
-                if dm: config_parts.append(f"d_model={dm.group(1)}")
-                if nh: config_parts.append(f"n_heads={nh.group(1)}")
-                if el: config_parts.append(f"e_layers={el.group(1)}")
-                if df: config_parts.append(f"d_ff={df.group(1)}")
-                if config_parts:
-                    config_str = ", ".join(config_parts)
+                                dm = re.search(r"_dm(\d+)_", folder.name)
+                                nh = re.search(r"_nh(\d+)_", folder.name)
+                                el = re.search(r"_el(\d+)_", folder.name)
+                                df = re.search(r"_df(\d+)_", folder.name)
 
-                folder_log = folder / "output.log"
-                if folder_log.exists():
-                    try:
-                        f_content = folder_log.read_text(encoding="utf-8")
-                        m = metric_pattern.findall(f_content)
-                        if m:
-                            mse_val = f"{float(m[-1][0]):.3f}"
-                            mae_val = f"{float(m[-1][1]):.3f}"
-                    except Exception:
-                        pass
+                                config_parts = []
+                                if dm: config_parts.append(f"d_model={dm.group(1)}")
+                                if nh: config_parts.append(f"n_heads={nh.group(1)}")
+                                if el: config_parts.append(f"e_layers={el.group(1)}")
+                                if df: config_parts.append(f"d_ff={df.group(1)}")
+                                if config_parts:
+                                    config_str = ", ".join(config_parts)
+                                break
+                        except Exception:
+                            pass
 
+            # Robust regex fallback matching test shape per horizon directly
             if mse_val == "-" and combined_log_text:
-                h_matches = re.findall(
-                    rf"(?:pl{h}_|ECL_96_{h}_).*?mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)",
-                    combined_log_text,
-                    flags=re.DOTALL
-                )
+                shape_pattern = rf"test shape:\s*\(\d+,\s*{h},\s*\d+\).*?mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)"
+                h_matches = re.findall(shape_pattern, combined_log_text, flags=re.DOTALL)
                 if h_matches:
                     mse_val = f"{float(h_matches[-1][0]):.3f}"
                     mae_val = f"{float(h_matches[-1][1]):.3f}"

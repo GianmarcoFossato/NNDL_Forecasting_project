@@ -5,10 +5,21 @@ from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
 import random
 import numpy as np
 from run import init_parser, OutputLogger
-from optuna.pruners import SuccessiveHalvingPruner
+from optuna.pruners import HyperbandPruner
 from functools import partial
 import json
 import shutil
+import copy
+
+
+def set_seed(seed):
+    """Set the random seed for reproducibility."""
+    random.seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
 
 def save_trials_callback(study, trial, args):
     subfolder = getattr(args, 'results_subfolder', 'evaluation')
@@ -19,71 +30,99 @@ def save_trials_callback(study, trial, args):
     last_trial_file = os.path.join(model_dir, f'trials_{args.model}_{args.model_id}.csv')
     df.to_csv(last_trial_file, index=False)
 
-def suggest_params(trial, args, hp_configs):
-    """Use Optuna to suggest hyperparameters based on the config file.
-       Catch special cases for certain models if needed."""
-    # Get the hyperparameter ranges from the config file
-    parameters = hp_configs['parameters']
 
-    # Override parameters for special cases
-    special_cases = hp_configs['special_cases']
-    if args.model in special_cases.keys():
-        special_parameters = special_cases[args.model]['parameters']
+def suggest_params(trial, args, hp_configs):
+    """
+    Use Optuna to suggest hyperparameters based on the config file.
+    Ensures structural dependencies (e.g., d_ff >= d_model) are respected.
+    """
+    parameters = hp_configs['parameters'].copy()
+
+    # Override parameters for special model cases
+    special_cases = hp_configs.get('special_cases', {})
+    if args.model in special_cases:
+        special_parameters = special_cases[args.model].get('parameters', {})
         for param, special_values in special_parameters.items():
             parameters[param] = special_values
 
-    # Get suggested values by Optuna
+    sampled = {}
+
+    # Sample d_model first
+    if 'd_model' in parameters:
+        p_kwargs = parameters['d_model']['kwargs']
+        p_type = parameters['d_model']['type']
+        if p_type == 'categorical':
+            d_model_val = trial.suggest_categorical('d_model', **p_kwargs)
+        elif p_type == 'int':
+            d_model_val = trial.suggest_int('d_model', **p_kwargs)
+        setattr(args, 'd_model', d_model_val)
+        sampled['d_model'] = d_model_val
+
+    # Sample d_ff while enforcing d_ff >= d_model
+    if 'd_ff' in parameters:
+        p_kwargs = parameters['d_ff']['kwargs']
+        p_type = parameters['d_ff']['type']
+        if 'd_model' in sampled and p_type == 'categorical':
+            valid_choices = [c for c in p_kwargs['choices'] if c >= sampled['d_model']]
+            if not valid_choices:
+                valid_choices = [sampled['d_model']]
+            d_ff_val = trial.suggest_categorical('d_ff', choices=valid_choices)
+        elif p_type == 'categorical':
+            d_ff_val = trial.suggest_categorical('d_ff', **p_kwargs)
+        elif p_type == 'int':
+            d_ff_val = trial.suggest_int('d_ff', **p_kwargs)
+        else:
+            d_ff_val = trial.suggest_float('d_ff', **p_kwargs)
+        setattr(args, 'd_ff', d_ff_val)
+        sampled['d_ff'] = d_ff_val
+
+    # Sample remaining parameters
     for param, param_kwargs in parameters.items():
-        if param_kwargs['type'] == 'categorical':
+        if param in sampled:
+            continue
+
+        p_type = param_kwargs['type']
+        if p_type == 'categorical':
             value = trial.suggest_categorical(param, **param_kwargs['kwargs'])
-        elif param_kwargs['type'] == 'float':
+        elif p_type == 'float':
             value = trial.suggest_float(param, **param_kwargs['kwargs'])
-        elif param_kwargs['type'] == 'int':
+        elif p_type == 'int':
             value = trial.suggest_int(param, **param_kwargs['kwargs'])
         else:
-            raise ValueError(f"Unknown parameter type: {param_kwargs['type']} for parameter {param}")
-        args.__setattr__(param, value)
+            raise ValueError(f"Unknown parameter type: {p_type} for parameter {param}")
+        setattr(args, param, value)
 
-
-    ### KEEP AS REFERENCE
-    # Special settings for ModernTCN due to its unique architecture
-    # if args.model == "ModernTCN":
-    #     args.num_blocks = torch.ones(args.e_layers, dtype=torch.int32).tolist()
-    #     args.large_size = torch.ones(args.e_layers, dtype=torch.int32).tolist() * 51
-    #     args.small_size = torch.ones(args.e_layers, dtype=torch.int32).tolist() * 5
-    #     args.dims = torch.ones(args.e_layers, dtype=torch.int32).tolist() * args.d_model
-    #     args.dw_dims = torch.ones(args.e_layers, dtype=torch.int32).tolist() * args.d_model
-
-    # Fix the feedforward dimension to be equal to d_model for the HP search
-    # args.d_ff = args.d_model
+    # Maintain derivative attributes consistently during search
+    if hasattr(args, 'd_model'):
+        args.d_temp = args.d_model
 
     return args
 
 
-def objective_func(trial, args, hp_configs, logger):
-    subfolder = getattr(args, 'results_subfolder', 'evaluation')
-    setting = os.path.join(f'hp_search_{args.model_id}_{args.model}', f'trial_{trial.number}')
+def objective_func(trial, args, hp_configs, logger, base_seed=2021):
+    # Isolated random seed per trial
+    trial_seed = base_seed + trial.number
+    set_seed(trial_seed)
+
+    # Deepcopy args to avoid mutating the base args across trials
+    trial_args = copy.deepcopy(args)
+
+    subfolder = getattr(trial_args, 'results_subfolder', 'evaluation')
+    setting = os.path.join(f'hp_search_{trial_args.model_id}_{trial_args.model}', f'trial_{trial.number}')
 
     try:
         # Collect suggested hyperparameters
-        args = suggest_params(trial, args, hp_configs)
-        exp = Exp_Long_Term_Forecast(args)
-        #setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
+        trial_args = suggest_params(trial, trial_args, hp_configs)
+        exp = Exp_Long_Term_Forecast(trial_args)
 
-        print(f">>>Starting trial {trial.number}<<<")
+        print(f"\n>>> Starting trial {trial.number} (seed={trial_seed}) <<<")
         exp.train(setting, trial)
 
         # Validate
         vali_data, vali_loader = exp._get_data(flag='val')
         criterion = exp._select_criterion()
         val_loss = exp.vali(vali_data, vali_loader, criterion)
-        print(f"Trial {trial.number} validation loss: {val_loss}")
-
-        # Clean up any leftover files/resources
-        # setting = f'hp_search_{args.model_id}_{args.model}/trial_{trial.number}'
-        # cleanup_path = os.path.join('./checkpoints/', setting)
-        # if os.path.exists(cleanup_path):
-        #     shutil.rmtree(cleanup_path)
+        print(f"Trial {trial.number} validation loss: {val_loss:.6f}")
 
         return val_loss
 
@@ -106,20 +145,14 @@ def objective_func(trial, args, hp_configs, logger):
         cleanup_path = os.path.join('./checkpoints/', setting)
         if os.path.exists(cleanup_path):
             shutil.rmtree(cleanup_path)
-
-
-def set_seed(seed):
-    """Set the random seed for reproducibility."""
-    random.seed(seed)
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 if __name__ == '__main__':
     logger = OutputLogger()
 
     hp_seed = 2021
-    test_seed = hp_seed
     set_seed(hp_seed)
 
     parser = init_parser()
@@ -153,11 +186,11 @@ if __name__ == '__main__':
     with open(args.path_to_hp_config, 'r') as f:
         hp_configs = json.load(f)
 
-    # initialize Optuna study with SuccessiveHalvingPruner
-    pruner = SuccessiveHalvingPruner(
-        min_resource=hp_configs["min_resource"],  # Minimum number of epochs
-        reduction_factor=hp_configs["reduction_factor"],  # Factor to reduce the number of trials
-        min_early_stopping_rate=hp_configs["min_early_stopping_rate"]
+    # SuccessiveHalvingPruner configuration
+    pruner = HyperbandPruner(
+        min_resource=hp_configs.get("min_resource", 3),
+        reduction_factor=hp_configs.get("reduction_factor", 2),
+        max_resource="auto"  # Optuna infers max epochs automatically from trial.report()
     )
 
     storage_url = f"sqlite:///{os.path.join(db_dir, 'optuna_study.db')}"
@@ -169,61 +202,37 @@ if __name__ == '__main__':
         storage=storage_url,
         direction='minimize',
         pruner=pruner,
-        load_if_exists=True  # Allows resuming optimization
+        load_if_exists=True
     )
 
-    # pass logger instance down to the objective callback
     bound_callback = partial(save_trials_callback, args=args)
-    objective = partial(objective_func, args=args, hp_configs=hp_configs, logger=logger)
+    objective = partial(objective_func, args=args, hp_configs=hp_configs, logger=logger, base_seed=hp_seed)
     study.optimize(objective, n_trials=hp_configs["n_trials"], callbacks=[bound_callback])
 
-    # output the best hyperparameters
+    # Output search results
+    print('\n' + '=' * 50)
+    print('Hyperparameter Search Finished')
     print('Number of finished trials:', len(study.trials))
     print('Best trial:')
     trial = study.best_trial
-    print('  Value:', trial.value)
-
+    print('  Value (Validation Loss):', trial.value)
+    print('  Best Parameters:')
     for key, value in trial.params.items():
-        setattr(args, key, value)
+        print(f'    {key}: {value}')
+    print('=' * 50 + '\n')
 
-    # args.d_ff = args.d_model
-    args.d_temp = args.d_model
+    # Save best parameters to JSON file for downstream shell scripts
+    best_params_file = os.path.join(db_dir, f'best_params_{args.model_id}_{args.model}_pl{args.pred_len}.json')
+    best_config_out = {
+        "model_id": args.model_id,
+        "model": args.model,
+        "pred_len": args.pred_len,
+        "best_val_loss": trial.value,
+        "best_params": trial.params
+    }
+    with open(best_params_file, 'w') as f:
+        json.dump(best_config_out, f, indent=4)
 
-    # Prediction lengths to evaluate
-    target_pred_lens = [96, 192, 336, 720]
-
-    # Loop over each length the optimized model
-    for p_len in target_pred_lens:
-        args.pred_len = p_len
-
-        exp = Exp_Long_Term_Forecast(args)
-
-        for ii in range(args.itr):
-            test_seed += 1
-            set_seed(test_seed)
-            setting = 'optimized_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_expand{}_dc{}_fc{}_eb{}_dt{}_{}_{}_{}'.format(
-                args.task_name,
-                args.model_id,
-                args.model,
-                args.data,
-                args.features,
-                args.seq_len,
-                args.label_len,
-                args.pred_len,
-                args.d_model,
-                args.n_heads,
-                args.e_layers,
-                args.d_layers,
-                args.d_ff,
-                args.expand,
-                args.d_conv,
-                args.factor,
-                args.embed,
-                args.distil,
-                args.des, ii, test_seed)
-            exp.train(setting)
-
-            # Test the optimized model
-            exp.test(setting)
+    print(f"Saved best parameter configuration to: {best_params_file}")
 
     logger.deactivate_file_logging()

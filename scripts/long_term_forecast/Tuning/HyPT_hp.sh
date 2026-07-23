@@ -16,7 +16,8 @@ python -u tune.py \
   --enc_in 321 \
   --dec_in 321 \
   --c_out 321 \
-  --patience 5 \
+  --patience 3 \
+  --lradj "type3" \
   --num_workers 0 \
   --no_compile \
   --results_subfolder "tuning" \

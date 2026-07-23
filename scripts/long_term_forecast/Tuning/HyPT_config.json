@@ -1,8 +1,8 @@
 {
-  "min_resource": 1,
+  "min_resource": 3,
   "reduction_factor": 2,
   "min_early_stopping_rate": 0,
-  "n_trials": 20,
+  "n_trials": 30,
   "parameters": {
     "learning_rate": {
       "type": "categorical",
