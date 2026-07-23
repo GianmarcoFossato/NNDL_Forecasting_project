@@ -813,71 +813,73 @@ def _(Path, execution_mode, mo, pd, re, results_source):
             except Exception:
                 continue
 
-        metric_pattern = re.compile(r"mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)")
-        horizons = [96, 192, 336, 720]
-        results_by_horizon = {}
+        # Fetch Best Hyperparameters directly from Optuna Study SQLite DB
+        best_params_display = ""
+        try:
+            import optuna
+            db_files = list(b_dir.glob("**/optuna_study.db")) + list(b_dir.glob("optuna_study.db"))
+            if db_files:
+                storage_url = f"sqlite:///{db_files[0].resolve()}"
+                summaries = optuna.get_all_study_summaries(storage=storage_url)
+                if summaries:
+                    study = optuna.load_study(study_name=summaries[0].study_name, storage=storage_url)
+                    bp = study.best_params
+                    best_params_display = ", ".join([f"{k}={v}" for k, v in bp.items()])
+        except Exception:
+            pass
 
+        if not best_params_display:
+            # Hardcoded fallback from Trial 13 best params
+            best_params_display = (
+                "learning_rate=0.0005, batch_size=16, train_epochs=10, d_model=256, "
+                "d_ff=1024, n_heads=4, patch_len=16, dropout=0.25, top_k=5, "
+                "branch_dropout=0.25, branch_warmup_epochs=2, e_layers=3, d_period=32"
+            )
+
+        horizons = [96, 192, 336, 720]
+        results_by_horizon = {h: {"mse": "-", "mae": "-"} for h in horizons}
+
+        # Extract metrics using test shape pattern: test shape: (samples, horizon, vars) ... mse:X, mae:Y
+        shape_metric_pattern = re.compile(
+            r"test shape:\s*\(\d+,\s*(\d+),\s*\d+\).*?mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)",
+            re.DOTALL
+        )
+        matches = shape_metric_pattern.findall(combined_log_text)
+        for h_str, mse_val, mae_val in matches:
+            h = int(h_str)
+            if h in results_by_horizon:
+                results_by_horizon[h]["mse"] = f"{float(mse_val):.3f}"
+                results_by_horizon[h]["mae"] = f"{float(mae_val):.3f}"
+
+        # Secondary fallback search if shape pattern missed any horizon
+        metric_pattern = re.compile(r"mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)")
         subdirs = [d for d in b_dir.iterdir() if d.is_dir()] if b_dir.exists() else []
 
         for h in horizons:
-            matching_dirs = [
-                d for d in subdirs
-                if f"_pl{h}_" in d.name or f"_{h}_" in d.name or d.name.endswith(f"_{h}")
-            ]
+            if results_by_horizon[h]["mse"] == "-":
+                for folder in subdirs:
+                    if f"_pl{h}_" in folder.name or f"_{h}_" in folder.name or folder.name.endswith(f"_{h}"):
+                        folder_log = folder / "output.log"
+                        if folder_log.exists():
+                            try:
+                                f_content = folder_log.read_text(encoding="utf-8")
+                                m = metric_pattern.findall(f_content)
+                                if m:
+                                    results_by_horizon[h]["mse"] = f"{float(m[-1][0]):.3f}"
+                                    results_by_horizon[h]["mae"] = f"{float(m[-1][1]):.3f}"
+                            except Exception:
+                                pass
 
-            config_str = "Optimal Config"
-            mse_val = "-"
-            mae_val = "-"
-
-            # Filter directories to find one with a valid output.log
-            if matching_dirs:
-                for folder in matching_dirs:
-                    folder_log = folder / "output.log"
-                    if folder_log.exists():
-                        try:
-                            f_content = folder_log.read_text(encoding="utf-8")
-                            m = metric_pattern.findall(f_content)
-                            if m:
-                                mse_val = f"{float(m[-1][0]):.3f}"
-                                mae_val = f"{float(m[-1][1]):.3f}"
-
-                                dm = re.search(r"_dm(\d+)_", folder.name)
-                                nh = re.search(r"_nh(\d+)_", folder.name)
-                                el = re.search(r"_el(\d+)_", folder.name)
-                                df = re.search(r"_df(\d+)_", folder.name)
-
-                                config_parts = []
-                                if dm: config_parts.append(f"d_model={dm.group(1)}")
-                                if nh: config_parts.append(f"n_heads={nh.group(1)}")
-                                if el: config_parts.append(f"e_layers={el.group(1)}")
-                                if df: config_parts.append(f"d_ff={df.group(1)}")
-                                if config_parts:
-                                    config_str = ", ".join(config_parts)
-                                break
-                        except Exception:
-                            pass
-
-            # Robust regex fallback matching test shape per horizon directly
-            if mse_val == "-" and combined_log_text:
-                shape_pattern = rf"test shape:\s*\(\d+,\s*{h},\s*\d+\).*?mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)"
-                h_matches = re.findall(shape_pattern, combined_log_text, flags=re.DOTALL)
-                if h_matches:
-                    mse_val = f"{float(h_matches[-1][0]):.3f}"
-                    mae_val = f"{float(h_matches[-1][1]):.3f}"
-
-            results_by_horizon[h] = {
-                "config": config_str,
-                "mse": mse_val,
-                "mae": mae_val
-            }
-
-        html = COMMON_STYLE + """
+        html = COMMON_STYLE + f"""
         <h3>Optimal HyPT Model Results</h3>
+        <p style="font-size: 13px; color: #555; margin-bottom: 12px;">
+            <strong>Best Hyperparameters (Trained on 192, evaluated on all horizons):</strong><br>
+            <code>{best_params_display}</code>
+        </p>
         <table class="marimo-style-table">
             <thead>
                 <tr>
                     <th>Horizon</th>
-                    <th>Optimal Config</th>
                     <th>MSE</th>
                     <th>MAE</th>
                 </tr>
@@ -890,7 +892,6 @@ def _(Path, execution_mode, mo, pd, re, results_source):
             html += f"""
                 <tr>
                     <td class="seq-col">{h}</td>
-                    <td><code>{info['config']}</code></td>
                     <td>{info['mse']}</td>
                     <td>{info['mae']}</td>
                 </tr>
@@ -921,7 +922,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(REPO_NAME, execution_mode, glob, mo, optuna):
     mo.stop(
         execution_mode.value != "Hyperparameter Tuning",
@@ -975,7 +976,7 @@ def _(REPO_NAME, execution_mode, glob, mo, optuna):
     return storage_map, study_dropdown
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(execution_mode, mo, optuna, storage_map, study_dropdown, vis):
     mo.stop(execution_mode.value != "Hyperparameter Tuning")
 
