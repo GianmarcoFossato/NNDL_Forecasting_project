@@ -851,9 +851,6 @@ def _(REPO_NAME, mo, os, zipfile):
                     # Create a clean relative path inside the zip file
                     _arc_name = os.path.relpath(_full_path, _source_dir)
                     _zipf.write(_full_path, _arc_name)
-                # Add result_long_term_forecast.txt from the repo root if it exists
-                if os.path.exists(_root_txt_file):
-                    _zipf.write(_root_txt_file, arcname="result_long_term_forecast.txt")
 
         # Read the streamlined zip into memory
         with open(_output_zip, "rb") as _f:
