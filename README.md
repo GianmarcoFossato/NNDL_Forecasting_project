@@ -46,6 +46,7 @@ Molab automatically downloads the official Electricity (ECL) compressed dataset 
 ├── data_provider/
 │   ├── data_factory.py            # Chooses the proper DataLoader
 │   └── data_loader.py             # Electricity data reader with sliding-window logic
+├── dataset/electricity/           # Electricity dataset
 ├── scripts/long_term_forecast/
 │   ├── ECL_script/                # Train/eval scripts per model, on Electricity
 │   ├── Tuning/                    # Optuna configs and scripts for HyPT
@@ -55,7 +56,7 @@ Molab automatically downloads the official Electricity (ECL) compressed dataset 
 ├── test_results/                  # Your own run outputs (downloadable as a zip via molab)
 ├── tune.py                        # Optuna tuning entry point
 ├── run.py                         # Unified entry point: parses args, dispatches tasks
-├── dataset/electricity/           # Electricity dataset
+├── NNDL Project.py                # Backup of the marimo notebook
 └── paper                          # Folder for the paper. Includes some image resources 
 ```
 
