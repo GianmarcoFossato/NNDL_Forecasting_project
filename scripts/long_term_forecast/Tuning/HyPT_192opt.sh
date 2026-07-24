@@ -56,6 +56,7 @@ COMMON_ARGS="--task_name long_term_forecast \
   --itr 1 \
   --batch_size $BATCH_SIZE \
   --num_workers $WORKERS \
+  --results_subfolder "tuning" \
   --no_compile"
 
 # --- Horizon Runs ---
