@@ -3,23 +3,23 @@ export CUDA_VISIBLE_DEVICES=0
 
 model_name="HyPT"
 
-# Architectural Hyperparameters
+# Architectural Hyperparameters (Optimized)
 D_MODEL=256
-D_PERIOD=16          # Decoupled Branch A dimension (1/4 of d_model)
-D_FF=512
+D_PERIOD=32          # Decoupled Branch A dimension
+D_FF=512             # d_model * d_ff_mult (256 * 2)
 N_HEADS=8
 E_LAYERS=2
-TOP_K=5
+TOP_K=3              # Top K periods
 PATCH_LEN=16         # Patch size for temporal embedding
 
-# Regularization & Training
+# Regularization & Training (Optimized)
 DROPOUT=0.1          # FFN, Patch, and Head dropout
-BRANCH_DROPOUT=0.1   # Hybrid path dropout
-BRANCH_WARMUP_EPOCHS=3
-LEARNING_RATE=0.0005
+BRANCH_DROPOUT=0.15  # Hybrid path dropout
+BRANCH_WARMUP_EPOCHS=2
+LEARNING_RATE=0.001
 EPOCHS=20
 PATIENCE=5
-BATCH_SIZE=32
+BATCH_SIZE=16
 WORKERS=0
 LR_ADJ="type3"       # Gentler decay schedule for multi-channel convergence
 
