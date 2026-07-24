@@ -1,0 +1,21 @@
+{
+    "model_id": "ECL_96_192_HP",
+    "model": "HyPT",
+    "pred_len": 192,
+    "best_val_loss": 0.12935463085868001,
+    "best_params": {
+        "d_model": 256,
+        "d_ff_mult": 2,
+        "learning_rate": 0.001,
+        "batch_size": 16,
+        "train_epochs": 20,
+        "n_heads": 8,
+        "patch_len": 16,
+        "dropout": 0.1,
+        "top_k": 3,
+        "branch_dropout": 0.15000000000000002,
+        "branch_warmup_epochs": 2,
+        "e_layers": 2,
+        "d_period": 32
+    }
+}

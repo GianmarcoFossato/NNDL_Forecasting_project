@@ -1,7 +1,20 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "optuna==4.9.0",
+# ]
+# ///
+
 import marimo
 
 __generated_with = "0.23.14"
 app = marimo.App(width="medium", auto_download=["html"])
+
+
+@app.cell
+def _(subprocess):
+    subprocess.run(["pip", "install", "optuna"])
+    return
 
 
 @app.cell
@@ -14,9 +27,12 @@ def _():
     import zipfile
     import pandas as pd
     import torch
+    import json
     import marimo as mo
+    import optuna
+    import optuna.visualization as vis
 
-    return Path, glob, mo, os, pd, re, subprocess, torch, zipfile
+    return Path, mo, optuna, os, pd, re, subprocess, torch, vis, zipfile
 
 
 @app.cell(hide_code=True)
@@ -87,7 +103,7 @@ def _(os, subprocess):
         print("Repository cloned successfully.")
 
     os.chdir(REPO_NAME)
-    return (REPO_NAME,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -188,20 +204,33 @@ def _(mo):
 
 
 @app.cell
-def _(REPO_NAME, execution_mode, mo, subprocess):
-    import optuna
-    import optuna.visualization as vis
-
+def _(execution_mode, mo, subprocess):
     mo.stop(
         execution_mode.value != "Hyperparameter Tuning",
         mo.md("*Hyperparameter Tuning is currently disabled by the Control Panel selection.*")
     )
 
     print("Starting hyperparameter tuning...")
-    subprocess.run(["chmod", "+x", REPO_NAME + "/scripts/long_term_forecast/Tuning/HyPT_hp.sh"])
-    subprocess.run(["bash", REPO_NAME + "/scripts/long_term_forecast/Tuning/HyPT_hp.sh"])
+    subprocess.run(["chmod", "+x", "scripts/long_term_forecast/Tuning/HyPT_hp.sh"])
+    subprocess.run(["bash", "scripts/long_term_forecast/Tuning/HyPT_hp.sh"])
     print("Tuning completed!")
-    return optuna, vis
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Test the optimized model
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    Test the optimized model
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -213,23 +242,12 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(mo):
     mo.md(r"""
-    ### DLinear
+    ## Evaluation of HyPT and baselines
+    Executes scripts assigned to run evaluation processes for implemented models.
     """)
-    return
-
-
-@app.cell
-def _(execution_mode, mo, model_selector, subprocess):
-    mo.stop(
-        execution_mode.value != "Model Evaluation" or "DLinear" not in model_selector.value,
-        mo.md("*DLinear execution skipped.*")
-    )
-
-    subprocess.run(["chmod", "+x", "scripts/long_term_forecast/ECL_script/DLinear.sh"])
-    subprocess.run(["bash", "scripts/long_term_forecast/ECL_script/DLinear.sh"])
     return
 
 
@@ -242,14 +260,10 @@ def _(mo):
 
 
 @app.cell
-def _(execution_mode, mo, model_selector, subprocess):
-    mo.stop(
-        execution_mode.value != "Model Evaluation" or "TimesNet" not in model_selector.value,
-        mo.md("*TimesNet execution skipped.*")
-    )
-
-    subprocess.run(["chmod", "+x", "scripts/long_term_forecast/ECL_script/TimesNet.sh"])
-    subprocess.run(["bash", "scripts/long_term_forecast/ECL_script/TimesNet.sh"])
+def _(mo):
+    mo.md(r"""
+    ### TimesNet
+    """)
     return
 
 
@@ -439,7 +453,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(Path, execution_mode, mo, pd, re, results_source):
+def _(Path, execution_mode, mo, optuna, pd, re, results_source):
     mo.stop(
         execution_mode.value == "Idle",
         mo.md("*Table display skipped while in Idle mode.*")
@@ -816,7 +830,6 @@ def _(Path, execution_mode, mo, pd, re, results_source):
         # Fetch Best Hyperparameters directly from Optuna Study SQLite DB
         best_params_display = ""
         try:
-            import optuna
             db_files = list(b_dir.glob("**/optuna_study.db")) + list(b_dir.glob("optuna_study.db"))
             if db_files:
                 storage_url = f"sqlite:///{db_files[0].resolve()}"
@@ -922,8 +935,8 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(REPO_NAME, execution_mode, glob, mo, optuna):
+@app.cell
+def _(Path, execution_mode, mo, optuna, results_source):
     mo.stop(
         execution_mode.value != "Hyperparameter Tuning",
         mo.md("*Optuna dashboard is disabled outside Hyperparameter Tuning mode.*")
@@ -933,7 +946,7 @@ def _(REPO_NAME, execution_mode, glob, mo, optuna):
         names = []
         s_map = {}
         for db_path in db_paths:
-            target_url = f"sqlite:///{db_path}"
+            target_url = f"sqlite:///{db_path.resolve()}"
             try:
                 summaries = optuna.get_all_study_summaries(storage=target_url)
                 for summary in summaries:
@@ -943,40 +956,30 @@ def _(REPO_NAME, execution_mode, glob, mo, optuna):
                 continue
         return names, s_map
 
-    # Primary search
-    primary_paths = sorted(list(set(
-        glob.glob("test_results/tuning/hp_search_*/optuna_study.db") +
-        glob.glob("test_results/tuning/**/optuna_study.db", recursive=True)
-    )))
-    study_names, storage_map = scan_optuna_studies(primary_paths)
+    # Target specific tuning subfolder based on the Marimo UI radio button selection
+    tuning_dir = Path(results_source.value) / "tuning"
 
-    # Fallback search
-    if not study_names:
-        fallback_patterns = [
-            "paper_test_results/tuning/hp_search_*/optuna_study.db",
-            "paper_test_results/tuning/**/optuna_study.db",
-            f"{REPO_NAME}/paper_test_results/tuning/hp_search_*/optuna_study.db",
-            f"{REPO_NAME}/paper_test_results/tuning/**/optuna_study.db",
-        ]
-        fallback_paths = []
-        for pattern in fallback_patterns:
-            fallback_paths.extend(glob.glob(pattern, recursive=True))
+    # Locate databases sorted by last modified timestamp
+    db_paths = sorted(
+        list(tuning_dir.glob("**/optuna_study.db")),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True
+    ) if tuning_dir.exists() else []
 
-        fallback_paths = sorted(list(set(fallback_paths)))
-        study_names, storage_map = scan_optuna_studies(fallback_paths)
+    study_names, storage_map = scan_optuna_studies(db_paths)
 
     if study_names:
         study_dropdown = mo.ui.dropdown(options=study_names, value=study_names[0], label="Select Study:")
         selector_ui = mo.vstack([mo.md("### Optuna Study Inspector"), study_dropdown])
     else:
         study_dropdown = None
-        selector_ui = mo.md("No Optuna studies found yet. Waiting for tuning process to generate database...")
+        selector_ui = mo.md(f"No Optuna studies found in `'{tuning_dir}'`.")
 
     selector_ui
     return storage_map, study_dropdown
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(execution_mode, mo, optuna, storage_map, study_dropdown, vis):
     mo.stop(execution_mode.value != "Hyperparameter Tuning")
 
@@ -1013,7 +1016,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, os, zipfile):
     _source_dir = "test_results"
     _output_zip = "test_results_archive.zip"
