@@ -882,7 +882,7 @@ def _(Path, execution_mode, json, mo, optuna, pd, re, results_source):
         if not b_dir.exists():
             return f"<p>No tuning directory found at <code>{b_dir}</code>.</p>"
 
-        # 1. Fetch Best Hyperparameters (from best_params_*.json or optuna_study.db)
+        # Fetch Best Hyperparameters (from best_params_*.json or optuna_study.db)
         best_params_display = ""
 
         # Try loading directly from JSON first
@@ -922,7 +922,7 @@ def _(Path, execution_mode, json, mo, optuna, pd, re, results_source):
         horizons = [96, 192, 336, 720]
         results_by_horizon = {h: {"mse": "-", "mae": "-"} for h in horizons}
 
-        # 2. Extract metrics from horizon-specific output.log files
+        # Extract metrics from horizon-specific output.log files
         folder_pattern = re.compile(r"long_term_forecast_ECL_96_(\d+)_")
         metric_pattern = re.compile(r"mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)")
 
@@ -947,7 +947,7 @@ def _(Path, execution_mode, json, mo, optuna, pd, re, results_source):
             except Exception:
                 continue
 
-        # 3. Build HTML Table
+        # Build HTML Table
         html = COMMON_STYLE + f"""
         <h3>Optimal HyPT Model Results</h3>
         <p style="font-size: 13px; color: #555; margin-bottom: 12px;">
