@@ -11,13 +11,13 @@ __generated_with = "0.23.14"
 app = marimo.App(width="medium", auto_download=["html"])
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(subprocess):
     subprocess.run(["pip", "install", "optuna"])
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import glob
     import os
@@ -32,7 +32,7 @@ def _():
     import optuna
     import optuna.visualization as vis
 
-    return Path, mo, optuna, os, pd, re, subprocess, torch, vis, zipfile
+    return Path, json, mo, optuna, os, pd, re, subprocess, torch, vis, zipfile
 
 
 @app.cell(hide_code=True)
@@ -236,17 +236,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Evaluation of HyPT and baselines
-    Executes scripts assigned to run evaluation processes for implemented models.
-    """)
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""
-    ## Evaluation of HyPT and baselines
-    Executes scripts assigned to run evaluation processes for implemented models.
+    Test the optimized model
     """)
     return
 
@@ -254,7 +244,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### TimesNet
+    ## Evaluation of HyPT and baselines
+    Executes scripts assigned to run evaluation processes for implemented models.
     """)
     return
 
@@ -453,7 +444,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(Path, execution_mode, mo, optuna, pd, re, results_source):
+def _(Path, execution_mode, json, mo, optuna, pd, re, results_source):
     mo.stop(
         execution_mode.value == "Idle",
         mo.md("*Table display skipped while in Idle mode.*")
@@ -816,33 +807,40 @@ def _(Path, execution_mode, mo, optuna, pd, re, results_source):
 
     # Hyperparameter tuning table formatter
     def format_tuning_results(b_dir: Path) -> str:
-        log_files = list(b_dir.glob("**/output.log")) + list(b_dir.glob("output.log"))
-        if not log_files and not (b_dir.exists() and list(b_dir.iterdir())):
+        if not b_dir.exists():
             return f"<p>No tuning directory found at <code>{b_dir}</code>.</p>"
 
-        combined_log_text = ""
-        for lp in set(log_files):
-            try:
-                combined_log_text += "\n" + lp.read_text(encoding="utf-8")
-            except Exception:
-                continue
-
-        # Fetch Best Hyperparameters directly from Optuna Study SQLite DB
+        # 1. Fetch Best Hyperparameters (from best_params_*.json or optuna_study.db)
         best_params_display = ""
-        try:
-            db_files = list(b_dir.glob("**/optuna_study.db")) + list(b_dir.glob("optuna_study.db"))
-            if db_files:
-                storage_url = f"sqlite:///{db_files[0].resolve()}"
-                summaries = optuna.get_all_study_summaries(storage=storage_url)
-                if summaries:
-                    study = optuna.load_study(study_name=summaries[0].study_name, storage=storage_url)
-                    bp = study.best_params
-                    best_params_display = ", ".join([f"{k}={v}" for k, v in bp.items()])
-        except Exception:
-            pass
 
+        # Try loading directly from JSON first
+        json_files = list(b_dir.glob("**/best_params_*.json"))
+        if json_files:
+            try:
+                with open(json_files[0], "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    bp = data.get("best_params", {})
+                    if bp:
+                        best_params_display = ", ".join([f"{k}={v}" for k, v in bp.items()])
+            except Exception:
+                pass
+
+        # Fallback to reading Optuna study DB
         if not best_params_display:
-            # Hardcoded fallback from Trial 13 best params
+            try:
+                db_files = list(b_dir.glob("**/optuna_study.db"))
+                if db_files:
+                    storage_url = f"sqlite:///{db_files[0].resolve()}"
+                    summaries = optuna.get_all_study_summaries(storage=storage_url)
+                    if summaries:
+                        study = optuna.load_study(study_name=summaries[0].study_name, storage=storage_url)
+                        bp = study.best_params
+                        best_params_display = ", ".join([f"{k}={v}" for k, v in bp.items()])
+            except Exception:
+                pass
+
+        # Static fallback if no parameters file was found
+        if not best_params_display:
             best_params_display = (
                 "learning_rate=0.0005, batch_size=16, train_epochs=10, d_model=256, "
                 "d_ff=1024, n_heads=4, patch_len=16, dropout=0.25, top_k=5, "
@@ -852,37 +850,32 @@ def _(Path, execution_mode, mo, optuna, pd, re, results_source):
         horizons = [96, 192, 336, 720]
         results_by_horizon = {h: {"mse": "-", "mae": "-"} for h in horizons}
 
-        # Extract metrics using test shape pattern: test shape: (samples, horizon, vars) ... mse:X, mae:Y
-        shape_metric_pattern = re.compile(
-            r"test shape:\s*\(\d+,\s*(\d+),\s*\d+\).*?mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)",
-            re.DOTALL
-        )
-        matches = shape_metric_pattern.findall(combined_log_text)
-        for h_str, mse_val, mae_val in matches:
-            h = int(h_str)
-            if h in results_by_horizon:
-                results_by_horizon[h]["mse"] = f"{float(mse_val):.3f}"
-                results_by_horizon[h]["mae"] = f"{float(mae_val):.3f}"
-
-        # Secondary fallback search if shape pattern missed any horizon
+        # 2. Extract metrics from horizon-specific output.log files
+        folder_pattern = re.compile(r"long_term_forecast_ECL_96_(\d+)_")
         metric_pattern = re.compile(r"mse:\s*([-\d.eE+]+),\s*mae:\s*([-\d.eE+]+)")
-        subdirs = [d for d in b_dir.iterdir() if d.is_dir()] if b_dir.exists() else []
 
-        for h in horizons:
-            if results_by_horizon[h]["mse"] == "-":
-                for folder in subdirs:
-                    if f"_pl{h}_" in folder.name or f"_{h}_" in folder.name or folder.name.endswith(f"_{h}"):
-                        folder_log = folder / "output.log"
-                        if folder_log.exists():
-                            try:
-                                f_content = folder_log.read_text(encoding="utf-8")
-                                m = metric_pattern.findall(f_content)
-                                if m:
-                                    results_by_horizon[h]["mse"] = f"{float(m[-1][0]):.3f}"
-                                    results_by_horizon[h]["mae"] = f"{float(m[-1][1]):.3f}"
-                            except Exception:
-                                pass
+        log_files = list(b_dir.glob("**/output.log"))
+        for log_path in log_files:
+            folder_name = log_path.parent.name
+            match = folder_pattern.search(folder_name)
+            if not match:
+                continue
 
+            pred_len = int(match.group(1))
+            if pred_len not in results_by_horizon:
+                continue
+
+            try:
+                content = log_path.read_text(encoding="utf-8")
+                metrics = metric_pattern.findall(content)
+                if metrics:
+                    mse_val, mae_val = metrics[-1]
+                    results_by_horizon[pred_len]["mse"] = f"{float(mse_val):.3f}"
+                    results_by_horizon[pred_len]["mae"] = f"{float(mae_val):.3f}"
+            except Exception:
+                continue
+
+        # 3. Build HTML Table
         html = COMMON_STYLE + f"""
         <h3>Optimal HyPT Model Results</h3>
         <p style="font-size: 13px; color: #555; margin-bottom: 12px;">
@@ -935,7 +928,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Path, execution_mode, mo, optuna, results_source):
     mo.stop(
         execution_mode.value != "Hyperparameter Tuning",
@@ -979,7 +972,7 @@ def _(Path, execution_mode, mo, optuna, results_source):
     return storage_map, study_dropdown
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(execution_mode, mo, optuna, storage_map, study_dropdown, vis):
     mo.stop(execution_mode.value != "Hyperparameter Tuning")
 
