@@ -14,8 +14,7 @@ The project introduces **HyPT**, my proposed model, and benchmarks it against a 
 You don't need to install anything locally. The whole project runs through a [marimo](https://marimo.io/) notebook hosted on **molab**, using free server-side compute (a single NVIDIA RTX PRO 6000 Blackwell + 4-core CPU).
 
 
-[![Open in molab](https://molab.marimo.io/molab-shield.svg)](https://molab.marimo.io/notebooks/nb_AzHXbosNtEGTcnaF8nLsHZ)
-
+[![Open in molab](https://molab.marimo.io/molab-shield.svg)](https://molab.marimo.io/notebooks/nb_zvjVSJCj48n58ntjd3Zwbr)
 
 From the notebook you can:
 - Fine-tune the hyperparameters of **HyPT**.
