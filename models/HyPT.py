@@ -59,13 +59,13 @@ class Model(nn.Module):
         # x_enc: [B, T, N]
         B, T, N = x_enc.size()
 
-        # 1. Instance Normalization
+        # Instance Normalization
         x_enc = self.revin(x_enc, 'norm')
 
-        # 2. Compute Linear Trend Baseline Path
+        # Compute Linear Trend Baseline Path
         trend_out = self.trend_proj(x_enc.transpose(1, 2))  # [B, N, pred_len]
 
-        # 3. Patching & Hybrid Encoder Path
+        # Patching & Hybrid Encoder Path
         x_enc_patched = x_enc.transpose(1, 2)  # [B, N, T]
         enc_out, n_vars = self.patch_embedding(x_enc_patched)
 

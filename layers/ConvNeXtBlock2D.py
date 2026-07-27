@@ -25,7 +25,8 @@ class ConvNeXtBlock2D(nn.Module):
         self.norm = nn.LayerNorm(out_channels)
 
     def forward(self, x):
-        # x shape: [B * N, C, H, W]
+        # x shape: [B, C, H, W]
+        # (where C=d_period, H=period, W=length // period)
         residual = self.shortcut(x)
 
         x = self.dwconv(x)

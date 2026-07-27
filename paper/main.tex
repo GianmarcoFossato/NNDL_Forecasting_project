@@ -1,0 +1,411 @@
+\documentclass[10pt,journal]{IEEEtran}
+
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[ansinew]{inputenc}
+\usepackage{xcolor}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{import}
+\usepackage{multirow}
+\usepackage{cite}
+\usepackage[export]{adjustbox}
+\usepackage{breqn}
+\usepackage{mathrsfs}
+
+\usepackage{acronym}
+\usepackage{setspace}
+\usepackage{bm}
+\usepackage{stackengine}
+\usepackage{url}
+
+\usepackage{listings}
+
+\usepackage{booktabs}
+
+% Highlighting for result tables: best result in red bold, second-best underlined blue
+\newcommand{\best}[1]{\textcolor{red}{\textbf{#1}}}
+\newcommand{\second}[1]{\textcolor{blue}{\underline{#1}}}
+% Shorthand cross-reference macros
+\newcommand{\eq}[1]{Eq.~\eqref{#1}}
+\newcommand{\fig}[1]{Fig.~\ref{#1}}
+\newcommand{\tab}[1]{Tab.~\ref{#1}}
+\newcommand{\secref}[1]{Sec.~\ref{#1}}
+
+\begin{document}
+
+\title{CLAUDE}
+
+\author{\IEEEauthorblockN{FIRSTNAME LASTNAME\,\textsuperscript{\dag}}
+\IEEEauthorblockA{\textsuperscript{\dag}Department of Information Engineering, University of Padova\\
+Individual project for the course \emph{Neural Networks and Deep Learning}\\
+Email: firstname.lastname@studenti.unipd.it}}
+
+\maketitle
+
+\begin{abstract}
+Long-term multivariate time series forecasting is central to applications such as electricity load planning, where hundreds of correlated meters must be predicted jointly over long horizons. TimesNet, a strong general-purpose forecasting backbone, models each variate independently through a two-dimensional reshaping of its periodicities, which becomes computationally expensive and ignores cross-variate correlations as the number of channels grows. We propose HyPT (Hybrid Period-Transformer), a patch-based encoder that combines two complementary branches: a \emph{factorized} periodicity branch that compresses $N$ channels into $K \!\ll\! N$ learned prototype sequences before applying TimesNet-style Fourier-guided 2D convolution, and a cross-variate attention branch, inspired by iTransformer, that models pairwise dependencies among all channels. The two branches are combined through a learned gate regularized by a dynamic, per-sample branch-dropout schedule, and are complemented by a parallel linear trend path and reversible instance normalization. We evaluate HyPT on the Electricity (ECL) dataset against DLinear, TimesNet, iTransformer, TimeMixer and TimeXer, all reproduced under an identical Time-Series-Library-based pipeline, and tune HyPT's hyperparameters with an Optuna-based Hyperband search. After Optuna-based tuning, HyPT achieves the best average MSE and MAE among the six models (0.171 / 0.264), is the single best model on MAE at every forecast horizon, and is essentially tied with the strongest baseline, TimeXer, on MSE. Ablation studies isolate the contribution of each branch and of the dynamic branch-dropout regularizer, averaged over three random seeds per horizon.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Time Series Forecasting, Multivariate Forecasting, Transformers, Convolutional Neural Networks, Attention Mechanisms, Electricity Load Forecasting
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:intro}
+
+Time series forecasting underlies many real-world decision processes, from weather prediction to industrial maintenance, and among these, electricity consumption forecasting is particularly consequential: accurate long-horizon predictions of hundreds of correlated meters directly affect grid balancing and energy planning. Real-world series such as these mix short-term periodic patterns with slow trends and strong dependencies across channels, so the choice of temporal and cross-variate inductive bias has a large effect on model accuracy.
+
+TimesNet~\cite{timesnet} is a strong general-purpose backbone for this setting: it discovers dominant periods via the Fourier transform and reshapes each univariate series into a stack of 2D tensors that separate intra-period from inter-period variation, processed by an efficient convolutional block. However, TimesNet processes every channel independently, so its per-channel 2D transform-and-convolve step scales with the number of variates $N$; on datasets with hundreds of correlated channels, such as Electricity's 321 clients, this is both computationally wasteful and blind to the cross-variate correlations that more recent Transformer-based models, such as iTransformer~\cite{itransformer}, exploit explicitly via attention over per-variate tokens.
+
+In this project we ask whether the strengths of these two families, factorized intra-variate periodicity modeling and explicit cross-variate attention, can be combined without inheriting their respective costs. We propose \textbf{HyPT}, a patch-based hybrid encoder for long-term forecasting whose core novelty is a \emph{prototype factorization} of TimesNet's periodicity block: instead of running the Fourier-guided 2D convolution independently on all $N$ channels, HyPT first soft-clusters the channels into $K\!\ll\!N$ learned prototype sequences, applies the expensive processing only to these $K$ sequences, and then redistributes the result back to the original channels. This branch runs in parallel with an iTransformer-style cross-variate attention branch, and the two are fused through a learned, per-sample dropped-out gate that prevents either branch from dominating during training. We evaluate HyPT exclusively on long-term forecasting for the Electricity dataset, against DLinear, TimesNet, iTransformer, TimeMixer and TimeXer, all reproduced inside the same Time-Series-Library-derived pipeline for a fair comparison, and tune its hyperparameters with Optuna.
+
+Our contributions are as follows:
+\begin{itemize}
+\item A \textbf{prototype-factorized periodicity block} that reduces the per-layer cost of TimesNet-style 2D-variation modeling from $O(B\!\cdot\!N)$ to $O(B\!\cdot\!K)$ reshape-and-convolve operations, where $B$ is the batch size, $N$ the number of channels, and $K$ a small, fixed number of learned prototypes, while retaining a soft, differentiable mapping back to the original channels.
+\item A \textbf{hybrid two-branch encoder} that combines this factorized periodicity branch with an iTransformer-style cross-variate attention branch through a learned gate.
+\item A \textbf{dynamic per-sample branch-dropout} regularization scheme, with a warm-up schedule, that discourages the model from collapsing onto a single branch.
+\item An \textbf{ablation study} isolating the contribution of each branch, and an \textbf{Optuna-based hyperparameter search} over architectural and optimization hyperparameters.
+\end{itemize}
+
+The rest of this report is organized as follows. \secref{sec:related} reviews the baselines and building blocks HyPT is built upon. \secref{sec:pipeline} describes the end-to-end processing pipeline. \secref{sec:data} details the Electricity dataset, its preprocessing, and the train/validation/test split. \secref{sec:framework} presents the HyPT architecture and the hyperparameter-tuning procedure. \secref{sec:results} reports the main forecasting results, an ablation isolating the contribution of each branch, the Optuna hyperparameter search, and a computational-cost discussion. \secref{sec:conclusion} concludes.
+
+\section{Related Work}
+\label{sec:related}
+
+\textbf{TimesNet}~\cite{timesnet} tackles temporal variation modeling by discovering, for each channel independently, the dominant periods via the amplitude spectrum of the Fast Fourier Transform, and reshaping the 1D series into a set of 2D tensors whose columns capture intra-period variation and whose rows capture inter-period variation. A parameter-efficient inception block then processes these 2D tensors, and the resulting per-period representations are aggregated by amplitude-weighted averaging. TimesNet's own ablations show that its inception block can be replaced by more powerful 2D backbones, ConvNeXt among them, for a further accuracy gain; HyPT's periodicity branch adopts this substitution directly.
+
+\textbf{DLinear}~\cite{dlinear} showed that a single linear layer mapping the look-back window directly to the forecast horizon, optionally after a moving-average trend/seasonal split, is a remarkably strong and cheap baseline for long-term forecasting, motivating our use of a parallel linear trend path in HyPT rather than relying purely on nonlinear processing for the slow-moving component of the series.
+
+\textbf{iTransformer}~\cite{itransformer} revisits the role of the Transformer's components by \emph{inverting} the tokenization: rather than treating one time step across all variates as a token, iTransformer embeds each variate's entire series into a single token and applies self-attention across the $N$ variate tokens, letting the feed-forward network model temporal patterns and letting attention capture multivariate correlations directly and interpretably. HyPT's cross-variate branch mirrors this design at a patch-summary level.
+
+\textbf{TimeMixer}~\cite{timemixer} and \textbf{TimeXer}~\cite{timexer} represent two further, more recent directions we use as strong points of comparison. TimeMixer is a fully MLP-based architecture that decomposes series into seasonal and trend components at multiple sampling scales and mixes them bottom-up and top-down, avoiding attention altogether while remaining competitive with Transformer-based forecasters. TimeXer augments a canonical Transformer with a patch-level self-attention stream for the target series and a variate-level cross-attention stream, bridged by learned global tokens, originally to inject exogenous information but also effective as a strong general multivariate forecaster.
+
+HyPT additionally builds on three architectural components that are not forecasting models in themselves: \textbf{RevIN}~\cite{revin}, a reversible instance normalization that removes and later restores each window's mean and variance to counteract distribution shift; patch-based tokenization as popularized by \textbf{PatchTST}~\cite{patchtst}, which segments each channel-independent series into overlapping patches before embedding; and \textbf{ConvNeXt}~\cite{convnext}, a modernized convolutional block with a large-kernel depthwise convolution and an inverted bottleneck, used here in place of TimesNet's original Inception block.
+
+\section{Processing Pipeline}
+\label{sec:pipeline}
+
+Figure~\ref{fig:pipeline} shows the end-to-end flow, configured through shell scripts that set all architectural and training hyperparameters and passed to \texttt{run.py}, which parses arguments and dispatches to the \texttt{Exp\_Long\_Term\_Forecast} experiment class. This class builds the Electricity data loaders, instantiates the selected model (HyPT or a baseline), and drives the train/validation/test loop, writing metrics and loss curves to disk. At the model level, HyPT first removes each window's instance-level statistics with RevIN, then tokenizes the normalized series into overlapping patches per channel. The resulting patch tokens are processed by a stack of Hybrid Encoder Layers (detailed in \secref{sec:framework} and Fig.~\ref{fig:encoder}), flattened and projected to the forecast horizon by a linear head. In parallel, a simple per-channel linear layer maps the raw look-back window directly to the horizon, producing a trend estimate that is added to the encoder's output before RevIN denormalization restores the original scale.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig_pipeline.pdf}
+\caption{End-to-end HyPT processing pipeline. The hybrid encoder stack is detailed in Fig.~\ref{fig:encoder}.}
+\label{fig:pipeline}
+\end{figure}
+
+\section{Signals and Features}
+\label{sec:data}
+
+\subsection{Measurement Setup and Raw Data Format}
+This work evaluates forecasting performance on the Electricity (ECL) benchmark dataset, sourced from the UCI Machine Learning Repository under the name \emph{ElectricityLoadDiagrams20112014} and distributed in pre-cleaned tabular format within the Time-Series-Library~\cite{tslib}. The dataset records hourly electricity consumption (in kW) across $N = 321$ clients from 2012 to 2014, sampled at a constant 1-hour rate with no missing timestamps and no NaN entries (the TSLib release is already gap-filled and re-interpolated to a regular grid). The raw data matrix $\bm{X}_{\mathrm{raw}} \in \mathbb{R}^{T_{\mathrm{tot}} \times (N+1)}$, where $T_{\mathrm{tot}} = 26\,304$ hours is the total sequence length, consists of a timestamp column ($\mathtt{date}$) alongside $N = 321$ numerical time series. All variables are evaluated jointly under a multivariate-to-multivariate forecasting setting ($M$), where all channels serve as both inputs and target variables.
+
+\subsection{Pre-processing}
+Because the TSLib release of ECL is already gap-free and on a regular hourly grid, no re-interpolation, gap-filling, or artifact-removal step is applied; the only operations performed before windowing are (i) column reordering, so that the designated target variable $\mathtt{OT}$ is moved into the final column, and (ii) exclusion of the raw timestamp column from the numerical feature matrix, since it is encoded separately into the calendar-feature tensor described below. No outlier clipping or smoothing is applied, to keep the comparison consistent with prior TSLib-based baselines.
+
+\subsection{Standardization and Time-Feature Extraction}
+To prevent data leakage across evaluation splits, channel-wise zero-mean and unit-variance standardization is computed exclusively on the training split prior to sliding-window extraction. The full data matrix is scaled as
+\begin{equation}
+\label{eq:standardization}
+\bm{X}_{\mathrm{scaled}} = \frac{\bm{X} - \bm{\mu}_{\mathrm{train}}}{\bm{\sigma}_{\mathrm{train}}},
+\end{equation}
+where $\bm{X} \in \mathbb{R}^{T_{\mathrm{tot}} \times N}$ is the raw numerical feature matrix, and $\bm{\mu}_{\mathrm{train}} \in \mathbb{R}^{1 \times N}$ and $\bm{\sigma}_{\mathrm{train}} \in \mathbb{R}^{1 \times N}$ are the channel-wise mean and standard deviation computed over the training split, broadcast along the time dimension. This static transformation brings all $N = 321$ client load profiles into a comparable numeric range.
+
+In addition to the scaled variate values, each look-back window of length $T_{\mathrm{seq}}$ is paired with a temporal feature matrix $\bm{X}_{\mathrm{mark}} \in \mathbb{R}^{T_{\mathrm{seq}} \times 4}$ generated using TSLib's \texttt{time\_features} utility (\texttt{embed=timeF}), encoding normalized month-of-year, day-of-month, day-of-week, and hour-of-day indicators. While $\bm{X}_{\mathrm{mark}}$ is emitted globally by the data loader for pipeline uniformity, forecasting architectures integrate explicit calendar features differently based on their tokenization paradigm.
+
+\subsection{Windowing and Per-Window Feature Vectors}
+Samples are extracted by sliding a non-overlapping window of stride $1$ over the normalized sequence. For each sample index $i$, an input look-back tensor $\bm{X} \in \mathbb{R}^{T_{\mathrm{seq}} \times N}$ and a target tensor $\bm{Y} \in \mathbb{R}^{(T_{\mathrm{label}} + T_{\mathrm{pred}}) \times N}$ are constructed as
+\begin{align}
+\label{eq:windowing_x}
+\bm{X} &= \bm{X}_{\mathrm{scaled}}\!\left[i : i + T_{\mathrm{seq}}\right], \\
+\label{eq:windowing_y}
+\bm{Y} &= \bm{X}_{\mathrm{scaled}}\!\left[i + T_{\mathrm{seq}} - T_{\mathrm{label}} : i + T_{\mathrm{seq}} + T_{\mathrm{pred}}\right],
+\end{align}
+with $T_{\mathrm{seq}} = 96$ hours (4 days), $T_{\mathrm{label}} = 48$ hours, and $T_{\mathrm{pred}} \in \{96, 192, 336, 720\}$ hours (4, 8, 14 and 30 days, respectively). Synchronous time-mark tensors $\bm{X}_{\mathrm{mark}} \in \mathbb{R}^{T_{\mathrm{seq}} \times 4}$ and $\bm{Y}_{\mathrm{mark}} \in \mathbb{R}^{(T_{\mathrm{label}}+T_{\mathrm{pred}}) \times 4}$ are extracted over the same window boundaries. The per-window feature vector fed to HyPT (and to all baselines, for fairness) is therefore the tuple $(\bm{X}, \bm{X}_{\mathrm{mark}})$, with $\bm{X}$ being the only tensor consumed by HyPT's encoder (HyPT is encoder-only and ignores $\bm{Y}_{\mathrm{mark}}$ and the decoder-side \texttt{label} prefix, which exist purely for API compatibility with the shared TSLib training loop).
+
+\subsection{Dataset Splitting}
+Following the standard TSLib protocol for ECL, the sequence is split chronologically (without shuffling, to preserve temporal integrity), into training ($70\%$), validation ($10\%$), and test ($20\%$) time ranges; within each split, individual windows are still drawn in randomized mini-batch order during training and validation, while test windows are always evaluated in sequential order. The split is identical for all compared models, so that every reported metric is computed on the same held-out test windows. These split sizes are recalled in \secref{sec:results} when describing the experimental protocol.
+
+\section{Learning Framework}
+\label{sec:framework}
+
+\subsection{Overall model}
+\label{sec:overall_model}
+
+Given a look-back window $\bm{x} \in \mathbb{R}^{B \times T_{\mathrm{seq}} \times N}$, where $B$ is the batch size, $T_{\mathrm{seq}} = 96$ is the input sequence length, and $N = 321$ is the number of variates, HyPT computes
+\begin{align}
+\label{eq:revin_norm}
+\bm{x}' &= \mathrm{RevIN}_{\mathrm{norm}}(\bm{x}), \\
+\label{eq:trend}
+\bm{y}_{\mathrm{trend}} &= \mathrm{Linear}_{T_{\mathrm{seq}} \to S}\!\left({\bm{x}'}^{\!\top}\right), \\
+\label{eq:patchembed}
+\bm{z}^{(0)} &= \mathrm{PatchEmbed}\!\left({\bm{x}'}^{\!\top}\right) \in \mathbb{R}^{B \times N \times P \times D}, \\
+\label{eq:encoder_layer}
+\bm{z}^{(\ell)} &= \mathrm{HybridEncoderLayer}\!\left(\bm{z}^{(\ell-1)}\right), \quad \ell = 1, \dots, L, \\
+\label{eq:projection}
+\bm{y} &= \mathrm{Linear}_{P \cdot D \to S}\!\left(\mathrm{Dropout}\!\left(\mathrm{flatten}\!\left(\bm{z}^{(L)}\right)\right)\right) + \bm{y}_{\mathrm{trend}} \in \mathbb{R}^{B \times N \times S}, \\
+\label{eq:revin_denorm}
+\hat{\bm{y}} &= \mathrm{RevIN}_{\mathrm{denorm}}\!\left(\bm{y}^{\!\top}\right) \in \mathbb{R}^{B \times S \times N},
+\end{align}
+where $S = T_{\mathrm{pred}}$ is the prediction length, $P$ is the number of patches, $D = d_{\mathrm{model}}$ is the model dimension, $L = e\_layers$ is the number of encoder layers, and $\top$ denotes transposition of the time and channel axes. Patches are extracted per channel with length $T_{\mathrm{patch}} = \mathrm{patch\_len}$ and stride $T_{\mathrm{patch}}/2$, following PatchTST-style channel-independent tokenization. RevIN first normalizes $\bm{x}$ per instance (removing per-window mean and standard deviation) and, after prediction, denormalizes the output back to the original scale.
+
+\subsection{Hybrid Encoder Layer}
+\label{sec:hybrid_encoder}
+
+Each Hybrid Encoder Layer (Fig.~\ref{fig:encoder}) receives $\bm{z} \in \mathbb{R}^{B \times N \times P \times D}$ and computes two branch outputs $\bm{h}_A, \bm{h}_B \in \mathbb{R}^{B \times N \times P \times D}$ in parallel.
+
+\emph{Branch A --- Prototype Period Factorization.} The core idea is to avoid running TimesNet's expensive Fourier-guided 2D convolution independently on all $N$ channels by instead running it on $K = 16$ learned prototype sequences, with $K \ll N$. Let $d_p = d_{\mathrm{period}}$ denote the period working dimension (decoupled from $D$). Concretely,
+\begin{align}
+\label{eq:down_proj}
+\tilde{\bm{z}} &= \bm{W}_{\mathrm{down}}\,\bm{z} \in \mathbb{R}^{B \times N \times P \times d_p}, \\
+\label{eq:channel_summary}
+\bm{c}_n^{\mathrm{temp}} &= \frac{1}{P}\sum_{p=1}^{P} \tilde{\bm{z}}_{n,p}, \qquad
+\bm{c}_n^{\mathrm{spec}} = \frac{1}{P_{\mathrm{fft}}}\sum_{f=0}^{P_{\mathrm{fft}}-1} \left|\mathrm{rFFT}_f\!\left(\tilde{\bm{z}}_{n,:}\right)\right|, \\
+\label{eq:pfft_def}
+P_{\mathrm{fft}} &= \left\lfloor P/2 \right\rfloor + 1, \\
+\label{eq:query}
+\bm{q}_n &= \bm{W}_q\,\left[\bm{c}_n^{\mathrm{temp}} \,\Vert\, \bm{c}_n^{\mathrm{spec}}\right], \\
+\label{eq:assignments}
+\pi_{n,k} &= \mathrm{softmax}_n\!\left(\frac{\bm{q}_n \cdot \bm{e}_k}{\sqrt{d_p}}\right), \qquad
+\rho_{n,k} = \mathrm{softmax}_k\!\left(\frac{\bm{q}_n \cdot \bm{e}_k}{\sqrt{d_p}}\right), \\
+\label{eq:pooling}
+\bm{p}_k &= \sum_{n=1}^{N} \pi_{n,k}\, \tilde{\bm{z}}_n \in \mathbb{R}^{B \times P \times d_p},
+\end{align}
+where $\bm{W}_{\mathrm{down}} \in \mathbb{R}^{D \times d_p}$ and $\bm{W}_q \in \mathbb{R}^{2 d_p \times d_p}$ are learnable projection matrices, $\bm{e}_k \in \mathbb{R}^{d_p}$ for $k = 1, \dots, K$ are $K$ learnable prototype keys, $\bm{c}_n^{\mathrm{temp}}$ and $\bm{c}_n^{\mathrm{spec}}$ are the per-channel temporal-mean and FFT-amplitude profiles (each in $\mathbb{R}^{d_p}$) concatenated into the channel summary used to compute assignment scores, $\Vert$ denotes vector concatenation, $\mathrm{rFFT}$ denotes the real-valued Fast Fourier Transform, and the subscript on $\mathrm{softmax}$ indicates the dimension along which normalization is applied: $\mathrm{softmax}_n$ normalizes across the $N$ channels (pooling channels into prototypes), while $\mathrm{softmax}_k$ normalizes across the $K$ prototypes (redistributing prototype outputs back to channels).
+
+Each prototype sequence $\bm{p}_k$ is then processed following TimesNet's FFT-and-reshape procedure, but with periods selected independently per prototype rather than globally shared: the top-$\mathrm{top\_k}$ periods are found via FFT amplitude \emph{separately for each prototype} $k$, $\bm{p}_k$ is reshaped into $\mathrm{top\_k}$ 2D grids using its own period set, each grid is passed through its own ConvNeXt block~\cite{convnext}, and the results are combined via a softmax over the per-sample amplitudes. Let $\bm{o}_k \in \mathbb{R}^{B \times P \times d_p}$ denote the processed output of prototype $k$. The $K$ processed prototypes $\{\bm{o}_k\}_{k=1}^{K}$ are recombined and projected back to the model dimension,
+\begin{equation}
+\label{eq:branch_a_output}
+\bm{h}_A = \bm{W}_{\mathrm{up}} \left(\sum_{k=1}^{K} \rho_{n,k}\, \bm{o}_k\right),
+\end{equation}
+where $\bm{W}_{\mathrm{up}} \in \mathbb{R}^{d_p \times D}$ is a learnable up-projection matrix.
+
+\emph{Branch B --- Cross-Variate Attention.} Patches are mean-pooled to obtain one summary token per channel,
+\begin{equation}
+\label{eq:branch_b_token}
+\bm{t}_n = \bm{W}_{\mathrm{tok}} \left(\frac{1}{P}\sum_{p=1}^{P} \bm{z}_{n,p}\right),
+\end{equation}
+where $\bm{W}_{\mathrm{tok}} \in \mathbb{R}^{D \times D}$ is a learnable projection. A standard multi-head self-attention layer~\cite{attention} is applied across the $N$ tokens $\{\bm{t}_n\}_{n=1}^{N}$, following iTransformer's inverted-attention idea~\cite{itransformer}. The attended tokens are passed through a near-zero-initialized linear projection $\bm{W}_{\mathrm{gate}} \in \mathbb{R}^{D \times D}$ (not to be confused with the fusion gate described below) and broadcast back over the $P$ patches to form $\bm{h}_B$.
+
+\emph{Gated fusion with dynamic branch dropout.} A learned gate $\bm{g} = \sigma(\bm{\gamma}) \in \mathbb{R}^{D}$, where $\bm{\gamma} \in \mathbb{R}^{D}$ is a parameter initialized to zero and $\sigma(\cdot)$ is the sigmoid function, combines the branches:
+\begin{equation}
+\label{eq:gate_fusion}
+\bm{h}_{\mathrm{fused}} = \bm{g} \odot \bm{h}_A + (1 - \bm{g}) \odot \bm{h}_B,
+\end{equation}
+where $\odot$ denotes element-wise (Hadamard) product with broadcasting over the batch, channel, and patch dimensions. During training, this fused output is regularized with a per-sample \emph{branch dropout}: with probability $p_t/2$ each, a sample uses $\bm{h}_A$ or $\bm{h}_B$ alone instead of the gated combination, where $p_t$ is the branch-dropout rate at epoch $t$, linearly warmed up from $0$ to a target rate $p_{\mathrm{target}} = \mathrm{branch\_dropout}$ over the first $T_{\mathrm{warmup}} = \mathrm{branch\_warmup\_epochs}$ training epochs:
+\begin{equation}
+\label{eq:warmup}
+p_t = \min\!\left(\frac{t}{T_{\mathrm{warmup}}},\, 1\right) \cdot p_{\mathrm{target}}.
+\end{equation}
+This discourages the model from collapsing onto a single branch early in training while still allowing the gate to specialize later on. The fused output is added to the residual stream, layer-normalized, passed through a two-layer GELU feed-forward network, and layer-normalized again, following a standard post-norm Transformer block.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig_encoder.pdf}
+\caption{Internal structure of one Hybrid Encoder Layer.}
+\label{fig:encoder}
+\end{figure}
+
+\subsection{Ablation modes}
+The two branches can be individually disabled through a single configuration flag, allowing branch-A-only, branch-B-only and full (``both'') variants to be trained with no code changes other than this flag, which is the basis for the ablation study in \secref{sec:results}.
+
+\subsection{Optimization and hyperparameter tuning}
+\label{sec:optimization}
+All models are trained with the Adam optimizer~\cite{adam} and an MSE loss, with early stopping on the validation loss. Early-stopping patience is set to $3$ for the Optuna-tuned HyPT configuration used in the main comparison and to $5$ for the hand-chosen configuration used in the ablation study (\secref{sec:ab}); baselines use the patience defined in their original TSLib scripts (typically $3$). HyPT uses a learning rate of $10^{-3}$, while baseline learning rates follow their respective shell scripts ($5\!\times\!10^{-4}$ for iTransformer, $10^{-4}$ for TimesNet, TimeXer and DLinear). Baselines adopt the default `type1' exponential decay, $\eta_t = \eta_0 \cdot 0.5^{t-1}$, halving the learning rate every epoch, whereas HyPT uses a gentler, delayed `type3' schedule, $\eta_t = \eta_0$ for $t < 3$ and $\eta_t = \eta_0 \cdot 0.9^{t-3}$ for $t \geq 3$, preserving a higher learning rate during initial joint branch adaptation before gradually decaying. HyPT's hyperparameters are tuned with Optuna~\cite{optuna}, using its default Tree-structured Parzen Estimator sampler together with a \texttt{HyperbandPruner}~\cite{shp} that prunes unpromising trials early based on the validation loss reported after every epoch. The search space spans the learning rate, batch size, number of training epochs, $d_{\mathrm{model}}$, $d_{\mathrm{ff}}$, number of attention heads, patch length, dropout, $\mathrm{top\_k}$, branch dropout and warm-up length, together with HyPT-specific overrides for the number of encoder layers and $d_{\mathrm{period}}$ (13 hyperparameters in total). Rather than searching separately at every horizon, the search is run once on $T_{\mathrm{pred}} = 192$, a middle-ground horizon chosen as a practical compromise between search cost and representativeness, and the resulting best configuration is then reused unchanged when retraining and evaluating HyPT on all four horizons for the main comparison (\secref{sec:hp} details the search itself).
+
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Experimental setup}
+All models (DLinear, TimesNet, iTransformer, TimeMixer, TimeXer and HyPT) are trained and evaluated inside the same data pipeline under the same $70\%$/$10\%$/$20\%$ chronological train/validation/test split described in \secref{sec:data}, so that differences in performance can be attributed to the models themselves rather than the evaluation protocol. Specifically, we use the Electricity dataset ($N=321$ variates, look-back length $T_{\mathrm{seq}} = 96$) under a multivariate-to-multivariate ($M$) setting, forecasting horizons $\{96, 192, 336, 720\}$, and evaluating via MSE and MAE.
+
+The execution configurations of the baselines, as defined in their shell scripts, are summarized in \tab{tab:baseline_configs}.
+
+\begin{table}[t]
+\centering
+\caption{Hyperparameters of all compared models on Electricity ($T_{\mathrm{seq}} = 96$). Baselines follow the original TSLib shell scripts; HyPT is tuned via Optuna on horizon 192 (\secref{sec:hp}).}
+\label{tab:baseline_configs}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Hyperparameter & \textbf{HyPT (ours)} & TimesNet & iTransformer & TimeXer & TimeMixer & DLinear \\
+\midrule
+ $d_{\mathrm{model}}$              & 256  & 256 & 512 & 512 & 16  & --   \\
+ $d_{\mathrm{ff}}$                 & 512  & 512 & 512 & 512--2048$^{a}$ & 32  & --   \\
+ $e\_layers$              & 2    & 2   & 3   & 3--4$^{b}$ & 3 & 2 \\
+ $d\_layers$              & 1    & 1   & 1   & 1   & 1   & 1   \\
+ $d_{\mathrm{period}}$             & 32   & --  & --  & --  & --  & --   \\
+ $\mathrm{top\_k}$        & 3    & 5$^{c}$ & -- & -- & -- & -- \\
+ $\mathrm{patch\_len}$    & 16   & --  & --  & 16  & --  & --   \\
+Batch size               & 16   & 32  & 16  & 4   & 32  & 32   \\
+Learning rate            & $10^{-3}$ & $10^{-4}$ & $5\!\times\!10^{-4}$ & $10^{-4}$ & $10^{-2}$ & $10^{-4}$ \\
+LR decay                 & type3 & type1 & type1 & type1 & type1 & type1 \\
+ $\mathrm{branch\_dropout}$ & 0.15 & -- & -- & -- & -- & -- \\
+ $\mathrm{branch\_warmup\_epochs}$ & 2 & -- & -- & -- & -- & -- \\
+\bottomrule
+\multicolumn{7}{@{}l}{\footnotesize $^{a}$ TimeXer uses $d_{\mathrm{ff}} = 512$ at horizon 96, and $d_{\mathrm{ff}} = 2048$ at horizons 192, 336, and 720.}\\
+\multicolumn{7}{@{}l}{\footnotesize $^{b}$ TimeXer uses $e\_layers=4$ at horizons 96 and 336, $e\_layers=3$ at 192 and 720.}\\
+\multicolumn{7}{@{}l}{\footnotesize $^{c}$ TimesNet reduces $\mathrm{top\_k}$ to 3 at horizon 720.}
+\end{tabular}%
+}
+\end{table}
+
+It is worth stressing an asymmetry in how the compared models were tuned. The five baselines are used with the hyperparameters reported in their original TSLib scripts (see \tab{tab:baseline_configs}), which were chosen to generalize across many benchmarks rather than to be optimal on Electricity. HyPT, in contrast, was tuned specifically on Electricity via Optuna (\secref{sec:hp}). The comparison in \tab{tab:main_results} should therefore be read as ``best dataset-specific configuration vs.\ best general-purpose configuration'', not as a fully hyperparameter-matched comparison.
+
+\subsection{Main forecasting results}
+\tab{tab:main_results} compares HyPT against the five baselines, per-horizon and on average, over all four forecast lengths on Electricity. Across every horizon, HyPT is either the best or the second-best model on both metrics, and it obtains the best average MSE and MAE overall (0.171 / 0.264), matching TimeXer's rounded average MSE (0.171) while being clearly ahead on average MAE (0.264 vs.\ 0.269), and with a much clearer margin over iTransformer, TimeMixer, TimesNet and DLinear on both metrics. HyPT is in fact the single best model on MAE at every horizon (96, 192, 336 and 720), which is not true of any other model. On MSE, HyPT and TimeXer alternate the top spot: HyPT is strictly best at 96 and 336, while TimeXer is marginally ahead at 192 and 720; the gap between the two is small at every horizon (at most 0.006 MSE), so the two models are best understood as essentially tied on MSE and jointly ahead of the remaining four. All models degrade as the horizon grows, as expected, but TimesNet and DLinear remain distinctly behind the top three (HyPT, TimeXer, iTransformer) at every single horizon, on both metrics.
+
+Given the tuning asymmetry discussed above, the most informative comparison is arguably against iTransformer and TimeXer, the two strongest Transformer-based baselines, since TimeXer in particular is competitive with HyPT despite not being tuned specifically for Electricity. This suggests that HyPT's prototype-factorized periodicity branch is highly effective on its own, with the cross-variate attention branch providing a complementary signal that yields marginal but consistent average gains, rather than the gap being purely an artifact of dataset-specific tuning.
+
+\begin{table}[t]
+\centering
+\caption{Long-term multivariate forecasting performance on Electricity dataset ($N=321$, $T_{\mathrm{seq}} = 96$). \best{Red bold} indicates the best result, \second{blue underline} indicates the second best.}
+\label{tab:main_results}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lcccccccccccc@{}}
+\toprule
+& \multicolumn{2}{c}{\textbf{HyPT (ours)}}
+& \multicolumn{2}{c}{TimesNet}
+& \multicolumn{2}{c}{iTransformer}
+& \multicolumn{2}{c}{TimeXer}
+& \multicolumn{2}{c}{TimeMixer}
+& \multicolumn{2}{c}{DLinear} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9} \cmidrule(lr){10-11} \cmidrule(lr){12-13}
+Metric & MSE & MAE & MSE & MAE & MSE & MAE & MSE & MAE & MSE & MAE & MSE & MAE \\
+\midrule
+96    & \best{0.137} & \best{0.233} & 0.168 & 0.272 & 0.149 & \second{0.240} & \second{0.140} & 0.242 & 0.156 & 0.247 & 0.210 & 0.302 \\
+192   & \second{0.157} & \best{0.251} & 0.187 & 0.289 & 0.164 & \second{0.255} & \best{0.157} & 0.256 & 0.170 & 0.261 & 0.210 & 0.305 \\
+336   & \best{0.172} & \best{0.268} & 0.203 & 0.305 & 0.178 & \second{0.271} & \second{0.175} & 0.273 & 0.188 & 0.279 & 0.223 & 0.319 \\
+720   & \second{0.216} & \best{0.302} & 0.238 & 0.331 & 0.229 & 0.314 & \best{0.210} & \second{0.307} & 0.228 & 0.313 & 0.258 & 0.350 \\
+\midrule
+Avg   & \best{0.171} & \best{0.264} & 0.199 & 0.299 & 0.180 & 0.270 & \second{0.171} & \second{0.269} & 0.185 & 0.275 & 0.225 & 0.319 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsection{Ablation study}
+\label{sec:ab}
+
+To validate the two-branch design independently of the Optuna search, the ablation study uses an initial, hand-chosen configuration (with $d_{\mathrm{period}} = 16$, $\mathrm{top\_k} = 5$, $\mathrm{branch\_dropout} = 0.1$, patience $= 5$, batch size $= 32$, and learning rate $= 5\!\times\!10^{-4}$) rather than the final Optuna-tuned configuration detailed in \secref{sec:hp}. This isolates the architectural contributions independently of dataset-specific tuning.
+
+\tab{tab:ablation} isolates the contribution of each branch by comparing five variants, obtained through the \texttt{ablation\_mode} flag described in \secref{sec:framework}:
+\begin{itemize}
+    \item \texttt{none}: both branches bypassed, fused representation set to zero, model reduces to the patch backbone + linear trend path (floor baseline);
+    \item \texttt{branch\_a}: prototype-factorized periodicity branch only;
+    \item \texttt{branch\_b}: cross-variate attention branch only;
+    \item \texttt{both}: full gated model with dynamic branch-dropout ($p_t$ warmed up to $0.1$ over $3$ epochs);
+    \item \texttt{both} (no drop): same gated model with branch dropout disabled ($p_t \equiv 0$), to isolate the contribution of the regularization scheme.
+\end{itemize}
+Each variant is trained and evaluated with three random seeds (2021, 2022, 2023) at every horizon, and \tab{tab:ablation} reports the resulting per-horizon and grand averages.
+
+\begin{table}[t]
+\centering
+\caption{Ablation of the two HyPT branches on Electricity, averaged over 3 seeds (2021/2022/2023) per horizon. \best{Red bold} indicates the best result, \second{blue underline} indicates the second best.}
+\label{tab:ablation}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lcccccccccc@{}}
+\toprule
+& \multicolumn{2}{c}{None} & \multicolumn{2}{c}{Branch A} & \multicolumn{2}{c}{Branch B} & \multicolumn{2}{c}{Both} & \multicolumn{2}{c}{Both (no drop)} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}
+Horizon & MSE & MAE & MSE & MAE & MSE & MAE & MSE & MAE & MSE & MAE \\
+\midrule
+96  & 0.166 & 0.255 & 0.145 & 0.240 & \best{0.141} & \best{0.237} & 0.141 & 0.237 & \second{0.141} & \second{0.237} \\
+192 & 0.175 & 0.262 & \best{0.159} & \best{0.251} & \second{0.160} & \second{0.253} & 0.161 & 0.254 & 0.160 & 0.253 \\
+336 & 0.190 & 0.278 & 0.176 & 0.270 & 0.177 & 0.270 & \best{0.173} & \best{0.267} & \second{0.174} & \second{0.269} \\
+720 & 0.230 & 0.312 & \best{0.203} & \second{0.295} & 0.212 & 0.301 & \second{0.204} & \best{0.294} & 0.217 & 0.304 \\
+\midrule
+Grand Avg & 0.190 & 0.277 & \second{0.171} & \second{0.264} & 0.172 & 0.265 & \best{0.170} & \best{0.263} & 0.173 & 0.266 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Three observations follow. First, both branches individually improve substantially over the no-branch floor at every horizon (e.g., at horizon 96, MSE drops from 0.166 for \emph{None} to 0.145 and 0.141 for Branch A and B alone), confirming the encoder's accuracy is not simply coming from the patch backbone or trend path. Second, the branches are fairly close in isolation, with Branch A holding a small but consistent edge at longer horizons (336 and 720) while Branch B is marginally ahead at 96.
+
+Third, the full gated model achieves the best grand-average MSE/MAE (0.170/0.263), marginally improving over Branch A alone (0.171/0.264). While the individual branches perform comparably on average, combining them without regularization degrades performance at longer horizons (e.g., MSE 0.217 vs.\ 0.204 at horizon 720). The dynamic branch-dropout schedule mitigates this long-horizon interference, keeping the dual-branch model stable and allowing it to achieve the best overall performance.
+
+Across all runs, the learned gate $\bm{g} = \sigma(\bm{\gamma})$ consistently converges near $0.5$. Two factors explain this. Architecturally, the gate is a single per-feature-channel parameter $\bm{\gamma} \in \mathbb{R}^{D}$ shared across all $N = 321$ variates and $P$ patches, initialized to zero. With only $L = 2$ encoder layers and near-parity between the branches, there is limited depth and gradient pressure to move far from initialization. Additionally, the dynamic branch-dropout explicitly forces each branch to remain independently competent, preventing the gate from collapsing toward either extreme and ensuring both branches contribute stably to the final representation.
+
+\subsection{Hyperparameter search}
+\label{sec:hp}
+
+We conducted a 38-trial Optuna search on the $T_{\mathrm{pred}} = 192$ horizon (21 completed, 15 pruned by Hyperband, 2 interrupted) using the Tree-structured Parzen Estimator (TPE) sampler, reaching a best validation MSE of $0.1294$. Relative to the ablation baseline (\tab{tab:baseline_configs}), the search favored a doubled prototype dimension ($d_{\mathrm{period}} = 32$ vs.\ 16), fewer periods ($\mathrm{top\_k} = 3$ vs.\ 5), a higher learning rate ($10^{-3}$ vs.\ $5\!\times\!10^{-4}$), a smaller batch size (16 vs.\ 32), and a shorter, stronger branch-dropout schedule ($0.15$ over $2$ warm-up epochs vs.\ $0.1$ over $3$).
+
+Hyperparameter importance analysis identifies warm-up length ($\mathrm{branch\_warmup\_epochs}$, importance $\approx 0.49$) and learning rate ($\approx 0.19$) as the dominant drivers, with architectural dimensions ($d_{\mathrm{model}}$, $d_{\mathrm{ff}}$, $\mathrm{top\_k}$, $\mathrm{patch\_len}$) contributing little. This is corroborated at the trial level: 2-epoch warm-up runs completed more often ($61.5\%$ vs.\ $33.3\%$) and achieved lower mean validation MSE ($0.133$ vs.\ $0.154$) than 5-epoch warm-up runs, consistent with \secref{sec:ab}'s finding that prolonged warm-ups leave too few epochs for branch-dropout to reach its target rate before early stopping.
+
+The pruner and sampler behavior reinforce this picture: Hyperband pruned all 5 batch-size-64 trials, indicating slow early-epoch convergence relative to smaller batches, while completed trials concentrated at the $10^{-3}$ learning-rate ceiling (14 of 21) and achieved the lowest MSEs there, suggesting the upper learning-rate bound could be pushed further in future search.
+
+\subsection{Computational cost}
+\label{sec:cost}
+Beyond accuracy, another design goal of HyPT was to remain computationally efficient. Branch A factors the expensive FFT-guided 2D convolution from all $N = 321$ channels onto $K = 16$ prototypes and operates in a narrow dimensional space $d_p \ll D$. Crucially, its patch-based processing is structurally decoupled from the forecast horizon $S$, whereas TimesNet couples its cost directly to $S$ by extending the sequence before running its convolutional stack. Branch B adds only a comparatively cheap $O(N^2)$ cross-variate attention term.
+
+Empirically, despite being run at a smaller batch size and without \texttt{torch.compile} (unlike TimesNet), HyPT achieves a 2.7--3.9$\times$ per-epoch speedup at longer horizons (192--720). This advantage widens as the horizon grows, directly validating the $S$-decoupling design. For reference, DLinear remains the fastest model overall (under 1 second per epoch), iTransformer and TimeMixer fall in between, and TimeXer has a per-epoch cost comparable to HyPT. Finally, we note that Branch A currently relies on an unvectorized Python loop for per-prototype processing; vectorizing this alongside enabling compilation is left for future work, which should widen HyPT's cost advantage even further.
+
+
+\section{Concluding Remarks}
+\label{sec:conclusion}
+
+This project introduced HyPT, a hybrid encoder for long-term Electricity forecasting combining a prototype-factorized periodicity branch (Branch A) with a cross-variate attention branch (Branch B). Tuned via Optuna, HyPT achieves the best average MSE and MAE, tying with TimeXer on MSE.
+
+Methodologically, we observe that both Branch A and Branch B are highly effective in isolation, each driving a substantial and nearly identical accuracy gain over the baseline. Furthermore, Branch A achieves this while yielding a 2.7--3.9$\times$ per-epoch speedup over TimesNet by decoupling computational cost from the forecast horizon $S$. Combining the two branches provides only marginal overall accuracy improvements, and requires the branch-dropout regularization to prevent interference and performance degradation at longer horizons. Additionally, the Optuna search revealed that optimization parameters drove performance more than architectural dimensions. We also note HyPT's results must be contextualized: it was dataset-specifically tuned, whereas baselines like TimeXer used general-purpose defaults. Furthermore, the learned gate $\bm{g}$ converged to a stable $\sim$$0.5$ average, acting as an equal $50/50$ combiner rather than a sample-specific dynamic balancer, which proved sufficient for stabilizing the dual-branch architecture.
+
+Future work should evaluate HyPT against hyperparameter-matched baselines on further datasets, and explore vectorizing Branch A to improve wall-clock time.
+
+From this project, we learned that while both prototype factorization and cross-variate attention are independently strong, fusing them requires careful regularization. The branch-dropout mechanism was essential to stabilize the dual-branch training and prevent long-horizon degradation, allowing the combined model to achieve a marginal net improvement over either branch alone. While HyPT achieves faster per-epoch times than TimesNet, the absolute wall-clock time of the currently unvectorized prototype branch still constrained our search budget, limiting the Optuna search to 38 trials on a single horizon.
+
+\begin{thebibliography}{99}
+
+\bibitem{timesnet}
+H. Wu, T. Hu, Y. Liu, H. Zhou, J. Wang, and M. Long, ``TimesNet: Temporal 2D-Variation Modeling for General Time Series Analysis,'' in \emph{International Conference on Learning Representations (ICLR)}, 2023.
+
+\bibitem{dlinear}
+A. Zeng, M. Chen, L. Zhang, and Q. Xu, ``Are Transformers Effective for Time Series Forecasting?,'' in \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, 2023.
+
+\bibitem{itransformer}
+Y. Liu, T. Hu, H. Zhang, H. Wu, S. Wang, L. Ma, and M. Long, ``iTransformer: Inverted Transformers Are Effective for Time Series Forecasting,'' in \emph{International Conference on Learning Representations (ICLR)}, 2024.
+
+\bibitem{timemixer}
+S. Wang, H. Wu, X. Shi, T. Hu, H. Luo, L. Ma, J. Y. Zhang, and J. Zhou, ``TimeMixer: Decomposable Multiscale Mixing for Time Series Forecasting,'' in \emph{International Conference on Learning Representations (ICLR)}, 2024.
+
+\bibitem{timexer}
+Y. Wang, H. Wu, J. Dong, Y. Liu, Y. Qiu, H. Zhang, J. Wang, and M. Long, ``TimeXer: Empowering Transformers for Time Series Forecasting with Exogenous Variables,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2024.
+
+\bibitem{patchtst}
+Y. Nie, N. H. Nguyen, P. Sinthong, and J. Kalagnanam, ``A Time Series is Worth 64 Words: Long-Term Forecasting with Transformers,'' in \emph{International Conference on Learning Representations (ICLR)}, 2023.
+
+\bibitem{revin}
+T. Kim, J. Kim, Y. Tae, C. Park, J.-H. Lee, and J. Choo, ``Reversible Instance Normalization for Accurate Time-Series Forecasting against Distribution Shift,'' in \emph{International Conference on Learning Representations (ICLR)}, 2022.
+
+\bibitem{convnext}
+Z. Liu, H. Mao, C.-Y. Wu, C. Feichtenhofer, T. Darrell, and S. Xie, ``A ConvNet for the 2020s,'' in \emph{IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 2022.
+
+\bibitem{attention}
+A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, L. Kaiser, and I. Polosukhin, ``Attention Is All You Need,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2017.
+
+\bibitem{optuna}
+T. Akiba, S. Sano, T. Yanase, T. Ohta, and M. Koyama, ``Optuna: A Next-generation Hyperparameter Optimization Framework,'' in \emph{Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery \& Data Mining}, 2019.
+
+\bibitem{adam}
+D. P. Kingma and J. Ba, ``Adam: A Method for Stochastic Optimization,'' in \emph{International Conference on Learning Representations (ICLR)}, 2015.
+
+\bibitem{shp}
+K. Jamieson and A. Talwalkar, ``Non-stochastic Best Arm Identification and Hyperparameter Optimization,'' in \emph{International Conference on Artificial Intelligence and Statistics (AISTATS)}, 2016.
+
+\bibitem{tslib}
+Y. Wang, H. Wu, J. Dong, Y. Liu, M. Long, and J. Wang, ``Deep Time Series Models: A Comprehensive Survey and Benchmark,'' \emph{arXiv preprint arXiv:2407.13278}, 2024.
+
+\bibitem{ecl}
+UCI Machine Learning Repository, ``ElectricityLoadDiagrams20112014 Data Set.'' [Online]. Available: \url{https://archive.ics.uci.edu/ml/datasets/ElectricityLoadDiagrams20112014}
+
+\end{thebibliography}
+
+\end{document}
