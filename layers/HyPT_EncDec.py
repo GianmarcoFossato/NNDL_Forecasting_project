@@ -8,7 +8,8 @@ class PrototypePeriodBlock(nn.Module):
     """
     Branch A (Factorized): Runs FFT and 2D ConvNeXt processing on K learned prototype
     temporal sequences (K << N) rather than all N channels independently.
-    Reduces compute complexity from O(B * N) to O(B * K).
+    Reduces the channel-dependent cost of the periodicity block from O(N) to O(K)
+    per layer, K << N (batch size B is unaffected).
     """
 
     def __init__(self, configs, conv_builder, n_prototypes=16):
@@ -27,7 +28,10 @@ class PrototypePeriodBlock(nn.Module):
         self.proto_query = nn.Linear(2 * self.d_period, self.d_period)
         self.proto_keys = nn.Parameter(torch.randn(n_prototypes, self.d_period) * 0.02)
 
-        # 2D ConvNeXt blocks operating solely in Prototype Space
+        # 2D ConvNeXt blocks operating solely in Prototype Space.
+        # NOTE: length is `k` (one block per period RANK), not k * n_prototypes.
+        # The rank-i block below is reused across all K prototypes' rank-i grid in
+        # _run_period_conv, so the branch's parameter count stays independent of K.
         self.conv_blocks = nn.ModuleList([
             conv_builder(self.d_period, self.d_period) for _ in range(self.k)
         ])
@@ -43,7 +47,11 @@ class PrototypePeriodBlock(nn.Module):
         amplitude = torch.mean(torch.abs(xf), dim=2)
         amplitude[:, :, 0] = 0.0  # Ignore DC component
 
-        # Average amplitude across Batch (B) -> [K, P_fft] per prototype
+        # Average amplitude across Batch (B) -> [K, P_fft] per prototype.
+        # Periods are therefore SELECTED from a batch-averaged spectrum (one shared
+        # period set per prototype), while the per-sample `amplitude` tensor above is
+        # reused below only to weight the contribution of each selected period per
+        # sample -- selection is batch-level, combination is per-sample.
         proto_amplitude = amplitude.mean(dim=0)  # [K, P_fft]
 
         # Select top-k frequencies independently PER PROTOTYPE: [K, k]
@@ -147,6 +155,8 @@ class CrossVariateBranch(nn.Module):
             configs.n_heads
         )
 
+        # W_proj: near-zero-initialized output projection (NOT a gating mechanism --
+        # unlike HybridEncoderLayer.gate, there is no sigmoid/multiplicative gate here)
         self.context_gate = nn.Linear(configs.d_model, configs.d_model)
         nn.init.zeros_(self.context_gate.bias)
         nn.init.normal_(self.context_gate.weight, std=0.02)
@@ -161,7 +171,7 @@ class CrossVariateBranch(nn.Module):
         # Cross-channel self-attention across N channels
         attn_out, _ = self.cross_attention(tokens, tokens, tokens, attn_mask=None)  # [B, N, D]
 
-        # Gate and broadcast back across patches
+        # Project attended tokens (near-zero init at start) and broadcast back across patches
         context = self.context_gate(attn_out)  # [B, N, D]
         context = context.unsqueeze(2).expand(-1, -1, P, -1)  # [B, N, P, D]
 

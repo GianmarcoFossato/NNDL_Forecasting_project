@@ -1,6 +1,6 @@
 # HyPT: Improving TimesNet for Long-Term Electricity Forecasting
 
-This repository contains my final project for the **Neural Networks and Deep Learning** course. It is an individual project whose goal was to improve the [TimesNet](https://openreview.net/forum?id=ju_Uqw384Oq) model on **long-term time series forecasting** for the **Electricity (ECL)** dataset.
+This repository contains my final project for the **Neural Networks and Deep Learning** course. It is an individual project whose goal was to improve the [TimesNet](https://openreview.net/forum?id=ju_Uqw384Oq) model on **long-term time series forecasting** for the **Electricity** dataset.
 
 The project introduces **HyPT**, my proposed model, and benchmarks it against a set of baseline models. It is built on top of [Time-Series-Library (TSLib)](https://github.com/thuml/Time-Series-Library) by THUML — all baseline implementations come from their codebase and match the corresponding original papers. On top of TSLib, this repo adds:
 
@@ -22,7 +22,7 @@ From the notebook you can:
 - View a live table comparing model performance.
 - Download a `test_results.zip` for any model(s) you've trained.
 
-> ⚠️ Model **weights are not saved/downloadable** due to their size and marimo's traffic limits.
+> ⚠️ Model **weights are not saved/downloadable** due to their size and molab's traffic limits.
 
 ### Data
 
@@ -32,31 +32,58 @@ Molab automatically downloads the official Electricity (ECL) compressed dataset 
 ## Project Structure
 
 ```
-├── models/
-│   ├── HyPT.py                   # My model
-│   ├── TimesNet.py               # Baseline being improved upon
-│   └── ...                       # Other baselines (DLinear, TimeMixer, TimeXer, iTransformer)
-├── layers/
-│   ├── HyPT_EncDec.py            # Layers specific to HyPT
-│   └── ...                       # Shared blocks used by baselines or developed for HyPT
-├── exp/
-│   ├── exp_basic.py               # Experiment base class, registers models, builds flows
-│   └── exp_long_term_forecasting.py  # Long-term forecasting logic
-├── data_provider/
-│   ├── data_factory.py            # Chooses the proper DataLoader
-│   └── data_loader.py             # Electricity data reader with sliding-window logic
-├── dataset/electricity/           # Electricity dataset
-├── scripts/long_term_forecast/
-│   ├── ECL_script/                # Train/eval scripts per model, on Electricity
-│   ├── Tuning/                    # Optuna configs and scripts for HyPT
-│   └── AugmentSample/             # Augmentation examples
-├── utils/                         # Metrics, EarlyStopping, augmentation, masking, etc.
-├── paper_test_results/            # Reference results for comparison
-├── test_results/                  # Your own run outputs (downloadable as a zip via molab)
-├── tune.py                        # Optuna tuning entry point
-├── run.py                         # Unified entry point: parses args, dispatches tasks
-├── NNDL Project.py                # Backup of the marimo notebook
-└── paper                          # Folder for the paper. Includes some image resources 
+├── NNDL Project.py                # Marimo notebook implementation backup for molab
+├── README.md                      # Project documentation
+├── requirements.txt               # Python package dependencies
+├── run.py                         # Unified entry point: parses CLI args and dispatches tasks
+├── tune.py                        # Optuna hyperparameter optimization entry point
+│
+├── data_provider/                 # Data loading and batching pipeline
+│   ├── data_factory.py            # DataLoader builder for dataset selection
+│   └── data_loader.py             # Dataset Electricity reader with sliding-window logic
+│
+├── dataset/                       # Local storage for datasets
+│   └── electricity/
+│       └── electricity.csv        # Electricity benchmark dataset (321 variates)
+│
+├── exp/                           # Experiment execution drivers
+│   ├── exp_basic.py               # Base class registering models and device placement
+│   └── exp_long_term_forecasting.py  # Long-term forecasting train/val/test workflow
+│
+├── layers/                        # Neural network layers and building blocks
+│   ├── HyPT_EncDec.py             # Hybrid Encoder Layer (Branch A, Branch B, Gated Fusion)
+│   ├── ConvNeXtBlock2D.py         # ConvNeXt 2D depthwise block for periodicity modeling
+│   ├── Embed.py                   # PatchTST-style tokenization and positional embeddings
+│   ├── RevIN.py                   # Reversible Instance Normalization layer
+│   ├── SelfAttention_Family.py    # Multi-head attention implementations
+│   └── ...                        # Additional baseline layers from TSLib
+│
+├── models/                        # Forecasting model implementations
+│   ├── HyPT.py                    # Proposed Hybrid Period-Transformer (HyPT) model
+│   ├── TimesNet.py                # 2D temporal variation baseline
+│   ├── iTransformer.py            # Inverted cross-variate attention baseline
+│   ├── TimeXer.py                 # Patch & variate attention baseline
+│   ├── TimeMixer.py               # Multiscale MLP-mixing baseline
+│   ├── DLinear.py                 # Linear decomposition baseline
+│   └── PatchTST.py                # Channel-independent patch Transformer baseline
+│
+├── paper/                         # LaTeX paper and visual assets
+│   ├── text/                      # paper LaTeX text source 
+│   └── resources/                 # Architecture diagrams and figures
+│
+├── paper_test_results/            # Reference benchmark results produced for the paper
+│   ├── ablation/                  # Seed-wise ablation logs (Seeds 2021, 2022, 2023)
+│   ├── evaluation/                # Model evaluation logs across forecast horizons
+│   └── tuning/                    # Optuna hyperparameter study databases and logs
+│
+├── scripts/                       # Shell scripts for experiments
+│   └── long_term_forecast/
+│       ├── Ablation/              # Scripts running component ablation studies
+│       ├── ECL_script/            # Model training/evaluation scripts on Electricity
+│       └── Tuning/                # Optuna HPO search configs and execution scripts
+│
+├── test_results/                  # Directory for local execution output logs and plots
+└── utils/                         # Metrics, EarlyStopping, time features, and tools
 ```
 
 ### Architecture, in short
