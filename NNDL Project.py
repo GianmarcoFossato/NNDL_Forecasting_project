@@ -313,7 +313,7 @@ def _(execution_mode, mo, model_selector, subprocess):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ###DLinear
+    ###TimesNet
     """)
     return
 
