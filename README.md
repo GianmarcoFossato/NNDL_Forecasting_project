@@ -20,7 +20,7 @@ From the notebook you can:
 - Fine-tune the hyperparameters of **HyPT**.
 - Run one or more of the implemented models (HyPT or any baseline) on the Electricity dataset.
 - View a live table comparing model performance.
-- Download a `test_results.zip` for any model(s) you've trained.
+- Download a `test_results.zip` for logs, loss curves, etc. of model(s) you've trained.
 
 > ⚠️ Model **weights are not saved/downloadable** due to their size and molab's traffic limits.
 
@@ -67,9 +67,9 @@ Molab automatically downloads the official Electricity (ECL) compressed dataset 
 │   ├── DLinear.py                 # Linear decomposition baseline
 │   └── PatchTST.py                # Channel-independent patch Transformer baseline
 │
-├── paper/                         # LaTeX paper and visual assets
-│   ├── text/                      # paper LaTeX text source 
-│   └── resources/                 # Architecture diagrams and figures
+├── report/                        # Folder for all report-related files
+│   ├── TeX source/                # LaTeX and images of the report 
+│   └── report.pdf/                # Report
 │
 ├── paper_test_results/            # Reference benchmark results produced for the paper
 │   ├── ablation/                  # Seed-wise ablation logs (Seeds 2021, 2022, 2023)
