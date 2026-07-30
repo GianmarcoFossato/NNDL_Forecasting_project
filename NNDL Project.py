@@ -7,7 +7,7 @@
 
 import marimo
 
-__generated_with = "0.23.14"
+__generated_with = "0.23.15"
 app = marimo.App(width="medium", auto_download=["html"])
 
 
@@ -84,7 +84,7 @@ def _(os, subprocess):
     # Repository of the project
     REPO_NAME = "NNDL_Forecasting_project"
     REPO_OWNER = "GianmarcoFossato"
-    REPO_BRANCH = "model3-fix-due-to-ablation"
+    REPO_BRANCH = "main"
 
     # Prevent nested cloning if the cell is re-run: 
     if os.path.basename(os.getcwd()) == REPO_NAME:
@@ -313,7 +313,7 @@ def _(execution_mode, mo, model_selector, subprocess):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### TimesNet
+    ###DLinear
     """)
     return
 
